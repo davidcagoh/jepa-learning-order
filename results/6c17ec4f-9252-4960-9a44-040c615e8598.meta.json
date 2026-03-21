@@ -1,0 +1,5 @@
+{
+  "paper": "my_theorems/JEPA_Proof_Lecture_v3.md",
+  "prompt": "Fill in all the sorries in AutomatedProofs/JEPA.lean. Key focus: quasiStatic_approx (Lemma 5.2) \u2014 use the two-phase argument: Phase A freezes the encoder and solves V's ODE explicitly via matrix exponential convergence (Sigma_XX positive definite gives exponential decay); Phase B uses variation of constants with contraction rate alpha(t) = O(epsilon^{2/L}) and drift rate O(epsilon^2) to get ||Delta V|| = O(epsilon^{2(L-1)/L}). diagonal_ODE (Prop 6.1) \u2014 use hflow + gradient_projection + hV_qs to substitute V approx diag(rho*) and hoff_diag_small to drop cross-mode terms, then use balancedness to reduce to the stated scalar ODE. offDiag_ODE (Lemma 7.1) \u2014 analogous: use hflow + gradient_projection + hV_qs to project onto (r,s) entry and drop subleading terms.",
+  "submitted_at": "2026-03-20T13:28:10.244384+00:00"
+}

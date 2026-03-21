@@ -1,4 +1,5 @@
 import Mathlib
+import AutomatedProofs.Lemmas
 
 /-!
 # JEPA Learns Influential Features First
@@ -11,6 +12,13 @@ small random initialisation, learns features in decreasing order of their
 generalised regression coefficient ρ*, even when the input and cross-covariance
 matrices share no common eigenbasis.
 -/
+
+set_option linter.style.longLine false
+set_option linter.style.whitespace false
+
+/-- Frobenius norm for matrices. -/
+noncomputable def matFrobNorm {n m : ℕ} (M : Matrix (Fin n) (Fin m) ℝ) : ℝ :=
+  Real.sqrt (∑ i, ∑ j, (M i j) ^ 2)
 
 variable {d : ℕ} (hd : 0 < d)
 
@@ -123,7 +131,7 @@ noncomputable def preconditioner (L : ℕ) (sigma_r sigma_s : ℝ) : ℝ :=
 lemma gradient_projection (dat : JEPAData d) (eb : GenEigenbasis dat)
     (Wbar V : Matrix (Fin d) (Fin d) ℝ) (r : Fin d) :
     (-(gradWbar dat Wbar V)).mulVec (eb.pairs r).v =
-    Vᵀ.mulVec ((eb.pairs r).rho • V.mulVec (Wbar.mulVec (dat.SigmaXX.mulVec (eb.pairs r).v))
+    Vᵀ.mulVec ((eb.pairs r).rho • Wbar.mulVec (dat.SigmaXX.mulVec (eb.pairs r).v)
               - V.mulVec (Wbar.mulVec (dat.SigmaXX.mulVec (eb.pairs r).v))) := by
   sorry
 
@@ -160,71 +168,103 @@ noncomputable def quasiStaticDecoder (dat : JEPAData d)
   Wbar * dat.SigmaYX * Wbarᵀ * (Wbar * dat.SigmaXX * Wbarᵀ)⁻¹
 
 /-- **Lemma 5.2 (Quasi-static decoder approximation).**
-    For L ≥ 2 and initialisation scale ε ≪ 1, the decoder satisfies
-    ‖V(t) - V_qs(W̄(t))‖ = O(ε^{2(L-1)/L}) uniformly for t ∈ [0, t_max*].
+    Under gradient-flow hypotheses (H1)–(H3), for L ≥ 2 and ε ≪ 1:
+    ‖V(t) - V_qs(W̄(t))‖_F = O(ε^{2(L-1)/L}) uniformly for t ∈ [0, t_max].
+
+    Hypotheses:
+    (H1) Encoder satisfies the preconditioned gradient flow, so it moves slowly:
+         ‖Ẇ̄(t)‖_F ≤ K · ε² for some K independent of ε.
+    (H2) Decoder satisfies the gradient-flow ODE: V̇(t) = -∇_V ℒ(W̄(t), V(t)).
+    (H3) Off-diagonal amplitudes are bounded: |c_{rs}(t)| ≤ K · ε^{1/L} for r ≠ s.
 
     PROVIDED SOLUTION
     Two-phase argument:
 
     Phase A (t ∈ [0, τ_A], τ_A = O(ε^{-2/L})):
-    Step 1: Show encoder moves at rate ‖Ẇ̄‖ = O(ε²) during Phase A.
-    Step 2: Over duration τ_A, encoder displacement is O(ε^{(2L-2)/L}) — negligible.
-    Step 3: With W̄ ≈ ε^{1/L} I fixed, the decoder ODE ̇V = -ε^{2/L}(V Σˣˣ - Σʸˣ)
-            is exactly solvable: V(t) = Σʸˣ(Σˣˣ)⁻¹(I - exp(-ε^{2/L} Σˣˣ t)) + ε^{1/L} exp(-ε^{2/L} Σˣˣ t).
-    Step 4: Exponential convergence to V_qs(ε^{1/L} I) = Σʸˣ(Σˣˣ)⁻¹ on timescale O(ε^{-2/L}).
-    Step 5: Encoder changes in eigenbasis during Phase A:
-            Δσ_r^A = O(ρ_r* ε^{(2L-3)/L}), Δc_{rs}^A = O(ε^{(2L-3)/L}).
-            Both are o(ε^{1/L}) for L ≥ 2.
+    Step 1: By (H1), encoder moves ≤ K ε² · τ_A = O(ε^{2(L-1)/L}) during Phase A.
+    Step 2: With W̄ ≈ ε^{1/L} I, V satisfies the frozen ODE V̇ = -ε^{2/L}(V Σˣˣ - Σʸˣ).
+    Step 3: Solve: V(t) = Σʸˣ(Σˣˣ)⁻¹(I - exp(-ε^{2/L} Σˣˣ t)) + V(0) exp(-ε^{2/L} Σˣˣ t).
+    Step 4: Since Σˣˣ ≻ 0, convergence is exponential on timescale O(ε^{-2/L}).
+            At t = τ_A, ‖V(τ_A) - V_qs(W̄(τ_A))‖ is exponentially small.
 
-    Phase B (t ∈ [τ_A, t_max*]):
-    Step 6: Define ΔV(t) = V(t) - V_qs(W̄(t)).
-            Using ∇_V ℒ = (V - V_qs) W̄ Σˣˣ W̄ᵀ, the deviation satisfies:
-            ΔV̇ = -ΔV · W̄ Σˣˣ W̄ᵀ - d/dt V_qs(W̄).
-    Step 7: Contraction rate α(t) = λ_min(W̄ Σˣˣ W̄ᵀ) = O(ε^{2/L}).
-    Step 8: Drift rate ‖∂_{W̄} V_qs‖_op · ‖Ẇ̄‖ = O(ε²).
-    Step 9: By variation of constants: ‖ΔV(t)‖_ss ≲ O(ε²)/O(ε^{2/L}) = O(ε^{2(L-1)/L}).
-    Step 10: For L ≥ 2, this → 0 as ε → 0. -/
+    Phase B (t ∈ [τ_A, t_max]):
+    Step 5: Set ΔV(t) = V(t) - V_qs(W̄(t)). Using (H2): ΔV̇ = -ΔV · W̄ Σˣˣ W̄ᵀ - d/dt V_qs(W̄).
+    Step 6: Contraction rate: apply frobenius_pd_lower_bound (Lemmas.lean) to A = W̄ Σˣˣ W̄ᵀ.
+            By (H-offdiag) and W̄ ≈ diag(σ_r), W̄ Σˣˣ W̄ᵀ is positive definite with
+            λ_min ≥ c₀ ε^{2/L}. Obtain λ from frobenius_pd_lower_bound hd (W̄ Σˣˣ W̄ᵀ).
+    Step 7: Drift rate: ‖d/dt V_qs(W̄)‖_F ≤ C · ε² by chain rule + (H1).
+    Step 8: Apply gronwall_approx_ode_bound (Lemmas.lean) to f(t) = ‖ΔV(t)‖_F:
+            f'(t) ≤ -λ_min(t)·f(t) + C·ε², ∫₀ᵗ λ_min ≥ 0, f(τ_A) exponentially small.
+            Conclude f(t) ≤ C·ε² / λ_min = O(ε^{2(L-1)/L}). -/
 lemma quasiStatic_approx (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (t_max : ℝ) (ht_max : 0 < t_max)
-    -- V and Wbar as functions of time
     (V Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ)
-    -- Gradient flow equations (hypotheses encoding the ODE)
-    (hV_flow : ∀ t : ℝ, deriv (fun t => ‖V t - quasiStaticDecoder dat (Wbar t)‖) t ≤ 0)  -- TODO: strengthen to exact ODE
-    -- Bound: ‖V(t) - V_qs(W̄(t))‖ = O(ε^{2(L-1)/L})
+    -- (H1) Encoder moves slowly (preconditioned gradient flow from balanced init)
+    (hWbar_slow : ∃ K : ℝ, 0 < K ∧ ∀ t ∈ Set.Icc 0 t_max,
+        matFrobNorm (deriv Wbar t) ≤ K * epsilon ^ 2)
+    (hWbar_init : ∃ K₀ : ℝ, 0 < K₀ ∧
+        matFrobNorm (Wbar 0) ≤ K₀ * epsilon ^ ((1 : ℝ) / L))
+    -- (H2) Decoder satisfies the gradient-flow ODE V̇ = -∇_V ℒ(W̄(t), V(t))
+    (hV_flow_ode : ∀ t ∈ Set.Icc 0 t_max,
+        HasDerivAt V (-(gradV dat (Wbar t) (V t))) t)
+    (hV_init : ∃ K₀ : ℝ, 0 < K₀ ∧
+        matFrobNorm (V 0) ≤ K₀ * epsilon ^ ((1 : ℝ) / L))
+    -- (H3) Off-diagonal amplitudes bounded by K · ε^{1/L}
+    (hoff_small : ∃ K : ℝ, 0 < K ∧ ∀ r s : Fin d, r ≠ s → ∀ t ∈ Set.Icc 0 t_max,
+        |offDiagAmplitude dat eb (Wbar t) r s| ≤ K * epsilon ^ ((1 : ℝ) / L))
     : ∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Icc 0 t_max,
-      ‖V t - quasiStaticDecoder dat (Wbar t)‖ ≤ C * epsilon ^ (2 * (L - 1) / L) := by
+      matFrobNorm (V t - quasiStaticDecoder dat (Wbar t)) ≤
+        C * epsilon ^ (2 * ((L : ℝ) - 1) / L) := by
   sorry
 
 /-! ## Section 6: Diagonal Dynamics — The Littwin ODE -/
 
 /-- **Proposition 6.1 (Effective diagonal ODE).**
-    Under approximate alignment c_{rs} = O(ε^{1/L}), the diagonal amplitude σ_r(t) satisfies
-    σ̇_r = σ_r^{3-1/L} λ_r* - (σ_r³ λ_r*) / ρ_r*,   λ_r* = ρ_r* μ_r,
-    to leading order in ε.
+    Under hypotheses (H-diag) and (H-offdiag), the diagonal amplitude σ_r(t) = u_r* W̄(t) v_r*
+    satisfies, to leading order in ε:
+    σ̇_r = σ_r^{3-1/L} λ_r* - (σ_r³ λ_r*) / ρ_r*,   λ_r* = ρ_r* μ_r.
+
+    Hypotheses:
+    (H-diag) σ_r is the diagonal amplitude of an encoder W̄ satisfying the preconditioned
+             gradient flow ODE, and V is quasi-static: ‖V(t) - V_qs(W̄(t))‖_F ≤ K ε^{2(L-1)/L}.
+    (H-offdiag) The off-diagonal amplitudes satisfy |c_{rs}(t)| ≤ K ε^{1/L} for all r ≠ s.
 
     PROVIDED SOLUTION
-    Step 1: Project the encoder gradient (Lemma 3.1) onto mode r.
-            Writing v_r = u_rᵀ V u_r* for the r-th decoder gain:
-            u_rᵀ (-∇_{W̄} ℒ) v_r* = v_r(ρ_r* - v_r) σ_r μ_r.
-    Step 2: Project the decoder gradient onto mode r:
-            v̇_r = -σ_r² μ_r (v_r - ρ_r*).
-    Step 3: This 2D system (σ_r, v_r) is identical in structure to the diagonal
-            JEPA system of Littwin et al. (2024), Theorem 4.2,
-            with parameters (λ_r*, μ_r, ρ_r*) in place of (λ_i, σ_i², ρ_i).
-    Step 4: Cross-mode coupling via c_{rs} enters only at next order O(ε^{1/L}).
-    Step 5: Apply the Littwin et al. balanced-network conservation law to reduce
-            the 2D system to the stated scalar ODE. -/
+    Step 1: Use the preconditioned diagonal gradient flow ODE for σ_r:
+            σ̇_r = P_{rr}(t) · u_rᵀ(-∇_{W̄} ℒ) v_r*.
+    Step 2: Apply Lemma 3.1 (gradient_projection):
+            u_rᵀ(-∇_{W̄} ℒ)v_r* = u_rᵀ Vᵀ(ρ_r* I - V) W̄ Σˣˣ v_r*.
+    Step 3: By (H-diag), V = diag(ρ_r*) + O(ε^{2(L-1)/L}), so
+            u_rᵀ Vᵀ(ρ_r* I - V) W̄ Σˣˣ v_r* = v_r(ρ_r* - v_r) σ_r μ_r + O(ε^{(2L-1)/L}).
+    Step 4: Cross-mode coupling: off-diagonal terms contribute O(ε^{(2L-1)/L}) by (H-offdiag).
+    Step 5: Apply balancedness: P_{rr}(t) = L σ_r^{2(L-1)/L}. Substitute v_r = ρ_r* + O(ε^{2(L-1)/L})
+            and use the Littwin et al. conservation law to reduce to the stated scalar ODE. -/
 lemma diagonal_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (r : Fin d)
-    (sigma_r : ℝ → ℝ)  -- diagonal amplitude as function of time
-    (v_r : ℝ → ℝ)      -- r-th decoder gain as function of time
-    -- Hypothesis: off-diagonal amplitudes are O(ε^{1/L})
-    (hoff_diag_small : ∀ s : Fin d, s ≠ r → ∃ C : ℝ, ∀ t : ℝ,
-      |v_r t| ≤ C * epsilon ^ ((1 : ℝ) / L))  -- TODO: this hypothesis needs refinement
-    -- Leading-order ODE for σ_r:
-    -- σ̇_r = σ_r^{3-1/L} λ_r* - σ_r³ λ_r* / ρ_r*
+    -- The encoder trajectory and decoder trajectory
+    (Wbar V : ℝ → Matrix (Fin d) (Fin d) ℝ)
+    -- σ_r is the diagonal amplitude of Wbar
+    (sigma_r : ℝ → ℝ)
+    (hsigma_def : ∀ t : ℝ, sigma_r t = diagAmplitude dat eb (Wbar t) r)
+    -- (H-diag, part 1) σ_r satisfies the preconditioned diagonal gradient flow ODE:
+    -- σ̇_r = P_{rr}(t) · u_rᵀ(-∇_{W̄} ℒ)v_r*
+    (hflow : ∀ t : ℝ, 0 ≤ t →
+        HasDerivAt sigma_r
+            (preconditioner L (sigma_r t) (sigma_r t) *
+             Matrix.dotProduct (dualBasis dat eb r)
+               ((-(gradWbar dat (Wbar t) (V t))).mulVec (eb.pairs r).v))
+            t)
+    -- (H-diag, part 2) Decoder is quasi-static: ‖V(t) - V_qs(W̄(t))‖_F ≤ K ε^{2(L-1)/L}
+    (hV_qs : ∃ K : ℝ, 0 < K ∧ ∀ t : ℝ, 0 ≤ t →
+        matFrobNorm (V t - quasiStaticDecoder dat (Wbar t)) ≤
+          K * epsilon ^ (2 * ((L : ℝ) - 1) / L))
+    -- (H-offdiag) Off-diagonal amplitudes are O(ε^{1/L})
+    (hoff_diag_small : ∃ K : ℝ, 0 < K ∧ ∀ s : Fin d, s ≠ r → ∀ t : ℝ, 0 ≤ t →
+        |offDiagAmplitude dat eb (Wbar t) r s| ≤ K * epsilon ^ ((1 : ℝ) / L))
+    -- Initial condition: σ_r(0) = O(ε^{1/L})
+    (hinit : |sigma_r 0| ≤ epsilon ^ ((1 : ℝ) / L))
     : ∃ C : ℝ, 0 < C ∧ ∀ t : ℝ, 0 ≤ t →
       |deriv sigma_r t -
         (sigma_r t ^ (3 - (1 : ℝ) / L) * projectedCovariance dat eb r
@@ -286,23 +326,46 @@ lemma critical_time_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
 /-! ## Section 7: Off-Diagonal Dynamics and the Grönwall Bound -/
 
 /-- **Lemma 7.1 (Off-diagonal ODE).**
-    Under Lemma 5.2, for r ≠ s:
+    Under the quasi-static decoder (Lemma 5.2), for r ≠ s:
     ċ_{rs} = -P_{rs}(t) · ρ_r*(ρ_r* - ρ_s*) μ_s · c_{rs} + O(ε^{(2L-1)/L}).
 
+    Hypotheses:
+    c_{rs} is the off-diagonal amplitude of W̄(t) satisfying the preconditioned
+    gradient flow, and V is quasi-static: ‖V(t) - V_qs(W̄(t))‖_F ≤ K ε^{2(L-1)/L}.
+
     PROVIDED SOLUTION
-    Step 1: Project Lemma 3.1 onto the (r,s) off-diagonal entry.
-            With V ≈ diag(ρ_r*):
-            u_rᵀ (-∇_{W̄} ℒ) v_s* = u_rᵀ Vᵀ (ρ_s* I - V) W̄ Σˣˣ v_s*
-                                    = ρ_r* (ρ_s* - ρ_r*) μ_s c_{rs}.
-    Step 2: Apply the balanced-network preconditioning factor P_{rs}
-            (Arora et al. 2019) to get the time derivative of c_{rs}.
-    Step 3: The O(ε^{2(L-1)/L}) error in V (Lemma 5.2) induces a forcing term
-            of size O(ε^{2(L-1)/L}) · ‖W̄‖ = O(ε^{2(L-1)/L}) · O(ε^{1/L}) = O(ε^{(2L-1)/L}). -/
+    Step 1: Project Lemma 3.1 (gradient_projection) onto the (r,s) off-diagonal entry:
+            dotProduct (dualBasis r) ((-∇W̄ℒ).mulVec (pairs s).v)
+              = dotProduct (dualBasis r) (Vᵀ.mulVec (ρ_s I - V).mulVec (W̄ Σˣˣ v_s))
+    Step 2: Write V = V_qs + ΔV where ‖ΔV‖_F ≤ K·ε^{2(L-1)/L} (from hV_qs).
+            V_qs acts on mode s with coefficient ρ_s* (quasi-static decoder property).
+            The diagonal part gives: dotProduct u_r (ρ_r*(ρ_s* - ρ_r*)·σ_s·Σˣˣv_s).
+    Step 3: Expand: the (r,s) entry = ρ_r*(ρ_s* - ρ_r*) · μ_s · c_rs
+            plus error term from ΔV bounded by ‖ΔV‖_F · ‖W̄‖_F ≤ K·ε^{2(L-1)/L} · K·ε^{1/L}
+            = O(ε^{(2L-1)/L}).
+    Step 4: Multiply by preconditioner P_{rs} to get the full ċ_{rs}. -/
 lemma offDiag_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (r s : Fin d) (hrs : r ≠ s)
-    (c_rs : ℝ → ℝ)    -- off-diagonal amplitude as function of time
-    (sigma_r sigma_s : ℝ → ℝ)  -- diagonal amplitudes
+    -- The encoder and decoder trajectories
+    (Wbar V : ℝ → Matrix (Fin d) (Fin d) ℝ)
+    -- c_{rs} is the off-diagonal amplitude of Wbar
+    (c_rs sigma_r sigma_s : ℝ → ℝ)
+    (hc_def : ∀ t : ℝ, c_rs t = offDiagAmplitude dat eb (Wbar t) r s)
+    (hsigma_r_def : ∀ t : ℝ, sigma_r t = diagAmplitude dat eb (Wbar t) r)
+    (hsigma_s_def : ∀ t : ℝ, sigma_s t = diagAmplitude dat eb (Wbar t) s)
+    -- c_{rs} satisfies the preconditioned off-diagonal gradient flow ODE:
+    -- ċ_{rs} = P_{rs}(t) · u_rᵀ(-∇_{W̄} ℒ) v_s*
+    (hflow : ∀ t : ℝ, 0 ≤ t →
+        HasDerivAt c_rs
+            (preconditioner L (sigma_r t) (sigma_s t) *
+             Matrix.dotProduct (dualBasis dat eb r)
+               ((-(gradWbar dat (Wbar t) (V t))).mulVec (eb.pairs s).v))
+            t)
+    -- Decoder is quasi-static: ‖V(t) - V_qs(W̄(t))‖_F ≤ K ε^{2(L-1)/L}
+    (hV_qs : ∃ K : ℝ, 0 < K ∧ ∀ t : ℝ, 0 ≤ t →
+        matFrobNorm (V t - quasiStaticDecoder dat (Wbar t)) ≤
+          K * epsilon ^ (2 * ((L : ℝ) - 1) / L))
     (t_max : ℝ) (ht_max : 0 < t_max) :
     ∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Icc 0 t_max,
       |deriv c_rs t
@@ -369,15 +432,18 @@ lemma preconditioner_integral_diverges_L1 (dat : JEPAData d) (eb : GenEigenbasis
     |c_{rs}(t)| = O(ε^{1/L})  for all r ≠ s, t ∈ [0, t_max*].
 
     PROVIDED SOLUTION
-    Step 1: From Lemma 7.1, c_{rs} satisfies a linear ODE with O(ε^{(2L-1)/L}) forcing.
-    Step 2: Apply the Grönwall inequality to bound the homogeneous part:
-            |c_{rs}(t)| ≤ |c_{rs}(0)| exp(κ_{rs} ∫₀ᵗ P_{rs}(u) du)
-                          + O(ε^{(2L-1)/L}) · t_max*,
-            where κ_{rs} = |ρ_r*(ρ_r* - ρ_s*)| μ_s.
-    Step 3: By Lemma 7.2, ∫₀^{t_max*} P_{rs} du = O(1), so the exponential factor is O(1).
-    Step 4: Initial condition: c_{rs}(0) = O(ε^{1/L}) from balanced initialisation.
-    Step 5: The forcing term contributes O(ε^{(2L-1)/L}) · O(ε^{-1/L}) = O(ε^{2(L-1)/L}).
-    Step 6: Therefore |c_{rs}(t)| ≤ O(ε^{1/L}) · O(1) + O(ε^{2(L-1)/L}) = O(ε^{1/L}). -/
+    Step 1: From h_ode, c_{rs} satisfies ċ_{rs} = -κ·P_{rs}(t)·c_{rs} + g(t) with |g(t)| ≤ C·ε^{(2L-1)/L},
+            where κ = ρ_r*(ρ_r* - ρ_s*)·μ_s > 0 (since ρ_r* > ρ_s* and ρ_s*, μ_s > 0).
+    Step 2: Apply gronwall_approx_ode_bound (AutomatedProofs.Lemmas) to f = c_{rs}:
+            α(t) = κ · preconditioner L (sigma_r t) (sigma_s t) ≥ 0,
+            η = C · ε^{(2L-1)/L},
+            f₀ = C₀ · ε^{1/L} (from h_init),
+            A_int = κ · C_int (from h_int_bound with C_int from Lemma 7.2).
+    Step 3: gronwall_approx_ode_bound gives:
+            |c_{rs}(t)| ≤ (C₀·ε^{1/L} + t_max·C·ε^{(2L-1)/L}) · exp(κ·C_int).
+    Step 4: Since ε < 1 and (2L-1)/L ≥ 1/L (for L ≥ 1):
+            ε^{(2L-1)/L} ≤ ε^{1/L}, so t_max·C·ε^{(2L-1)/L} ≤ t_max·C·ε^{1/L}.
+    Step 5: Choose C' = (C₀ + t_max·C)·exp(κ·C_int). Then |c_{rs}(t)| ≤ C'·ε^{1/L}. -/
 theorem offDiag_bound (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (r s : Fin d) (hrs : r ≠ s)
@@ -457,8 +523,16 @@ theorem JEPA_rho_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
     (V Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ)
     -- Gradient flow from balanced initialisation
     (h_init : BalancedInit d L epsilon)
-    -- Encoder product is the composition of layers
-    (h_Wbar : ∀ t : ℝ, True)  -- placeholder for gradient flow ODE hypotheses
+    -- (H1) Encoder moves slowly: ‖Ẇ̄(t)‖_F ≤ K ε² (from preconditioned gradient flow)
+    (hWbar_slow : ∃ K : ℝ, 0 < K ∧ ∀ t ∈ Set.Icc 0 t_max,
+        matFrobNorm (deriv Wbar t) ≤ K * epsilon ^ 2)
+    (hWbar_init : ∃ K₀ : ℝ, 0 < K₀ ∧
+        matFrobNorm (Wbar 0) ≤ K₀ * epsilon ^ ((1 : ℝ) / L))
+    -- (H2) Decoder satisfies gradient-flow ODE V̇ = -∇_V ℒ(W̄(t), V(t))
+    (hV_flow_ode : ∀ t ∈ Set.Icc 0 t_max,
+        HasDerivAt V (-(gradV dat (Wbar t) (V t))) t)
+    (hV_init : ∃ K₀ : ℝ, 0 < K₀ ∧
+        matFrobNorm (V 0) ≤ K₀ * epsilon ^ ((1 : ℝ) / L))
     :
     -- (A) Quasi-static decoder
     (∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Icc 0 t_max,

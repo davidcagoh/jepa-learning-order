@@ -1,0 +1,5 @@
+{
+  "paper": "my_theorems/JEPA_Proof_Lecture_v2.md",
+  "prompt": "Fill in all the sorries in this project. AutomatedProofs/Lemmas.lean contains two helper lemmas with detailed PROVIDED SOLUTION blocks: (1) pd_quadratic_lower_bound - the Rayleigh quotient lower bound for positive definite matrices (Horn-Johnson Matrix Analysis Theorem 4.2.2), proved via compactness of the unit sphere; (2) frobenius_pd_lower_bound - consequence applying the bound column-by-column; (3) gronwall_integral_ineq - variable-coefficient Gronwall inequality (classical ODE theory, see Teschl ODE Dynamical Systems p.47), proved by introducing the integrating factor; (4) gronwall_approx_ode_bound - Gronwall applied to approximate linear ODEs. Use these helpers to fill in offDiag_bound, quasiStatic_approx, diagonal_ODE, and offDiag_ODE in JEPA.lean.",
+  "submitted_at": "2026-03-21T05:10:41.639160+00:00"
+}
