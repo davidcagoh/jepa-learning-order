@@ -1,26 +1,31 @@
 # automated-proofs
 
-A workspace for formalizing mathematical proofs in Lean 4 using [Aristotle](https://aristotle.harmonic.fun) — Harmonic's automated theorem proving service.
+A GitHub template for formalizing mathematical proofs in Lean 4 using [Aristotle](https://aristotle.harmonic.fun) — Harmonic's automated theorem proving service.
 
-The workflow is human-assisted: a proof paper (markdown) is manually translated into a Lean skeleton, then submitted to Aristotle in iterative rounds until all `sorry` placeholders are filled. Tooling manages the submission/retrieval loop.
+The workflow is human-assisted: a proof paper (markdown) is translated into a Lean skeleton, then submitted to Aristotle in iterative rounds until all `sorry` placeholders are filled. Tooling manages the submission/retrieval loop.
 
-## Current proof
+## Using this template
 
-**JEPA Learns Influential Features First** — formalizing the result that a depth-L ≥ 2 linear JEPA model trained from small random initialisation learns features in decreasing order of their generalised regression coefficient ρ*, without assuming simultaneous diagonalisability of the input and cross-covariance matrices.
+```bash
+# 1. Click "Use this template" on GitHub, name your repo, clone it
+git clone https://github.com/<you>/<your-repo> && cd <your-repo>
 
-Source: `AutomatedProofs/JEPA.lean`, with helper lemmas in `AutomatedProofs/Lemmas.lean`.
+# 2. Initialise: rename the Lean library, seed project dirs, squash template history
+python scripts/init.py <ProjectName>
+
+# 3. Add your Aristotle API key
+echo "ARISTOTLE_API_KEY=arstl_..." > .env
+
+# 4. Scaffold a new theorem from a paper
+# (uses the /new-theorem Claude Code skill)
+```
 
 ## Setup
 
 Python 3.10+ and a Lean 4 toolchain are required.
 
 ```bash
-pip install aristotlelib python-dotenv
-```
-
-Create `.env` in the project root:
-```
-ARISTOTLE_API_KEY=arstl_...
+pip install aristotlelib pathspec python-dotenv
 ```
 
 ## Scripts
@@ -28,6 +33,9 @@ ARISTOTLE_API_KEY=arstl_...
 All scripts run from the project root.
 
 ```bash
+# One-time init after forking the template
+python scripts/init.py <ProjectName>
+
 # See current sorry count and submission status
 python scripts/status.py
 
@@ -50,12 +58,12 @@ Annotated results are written to `reports/<PaperName>_annotated.md` with per-lem
 | Packaging and submitting to Aristotle | ✓ |
 | Polling status and downloading results | ✓ |
 | Annotating the paper with proof outcomes | ✓ |
-| Generating the initial Lean skeleton from a paper | Human |
+| Generating the initial Lean skeleton from a paper | `/new-theorem` skill (Claude Code) |
 | Diagnosing remaining sorries between rounds | Human |
 | Creating helper lemmas for Mathlib gaps | Human |
 
 ## Lean environment
 
-- **Local toolchain**: `leanprover/lean4:v4.29.0-rc6`
-- **Aristotle's toolchain**: `leanprover/lean4:v4.28.0` (fixed; returned proofs target this version)
-- **Entry point**: `AutomatedProofs.lean` → imports `Basic`, `Lemmas`, `JEPA`
+- **Toolchain**: `leanprover/lean4:v4.28.0` (matches Aristotle's fixed version — no porting needed)
+- **Mathlib**: `v4.28.0` / commit `8f9d9cff6bd728b17a24e163c9402775d9e6a365`
+- **Entry point**: `<ProjectName>.lean` — add imports here in dependency order
