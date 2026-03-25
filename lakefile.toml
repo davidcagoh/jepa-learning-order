@@ -2,6 +2,7 @@ name = "automated-proofs"
 version = "0.1.0"
 keywords = ["math"]
 defaultTargets = ["AutomatedProofs"]
+packagesDir = "../.lean-packages"
 
 [leanOptions]
 pp.unicode.fun = true # pretty-prints `fun a ↦ b`

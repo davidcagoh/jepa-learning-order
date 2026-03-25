@@ -991,7 +991,7 @@ This repo is a GitHub template. After `python scripts/init.py <ProjectName>` the
 │   ├── status.py                 # dashboard: sorry counts + job statuses
 │   ├── _report.py                # internal helper (called by retrieve.py)
 │   └── _common.py                # shared utilities
-├── lakefile.toml                 # project config (Lean v4.28.0, Mathlib v4.28.0)
+├── lakefile.toml                 # project config (Lean v4.28.0, Mathlib v4.28.0, packagesDir = "../.lean-packages")
 ├── lean-toolchain                # leanprover/lean4:v4.28.0
 ├── lake-manifest.json            # pinned dependency tree
 ├── aristotle-docs.md             # Aristotle API docs (gitignored)
@@ -1009,3 +1009,21 @@ python scripts/init.py <ProjectName>   # rename, seed dirs, squash history
 # Add your ARISTOTLE_API_KEY to .env
 # Then: /new-theorem my_theorems/<paper>.md
 ```
+
+### Shared Mathlib cache (saves ~7 GB per project)
+
+`lakefile.toml` is pre-configured with `packagesDir = "../.lean-packages"`. This means Mathlib and all other Lake dependencies are downloaded **one level up** from the project, into a shared `.lean-packages/` directory that all sibling projects can reuse.
+
+**Recommended layout** — clone all your Lean projects into the same parent folder:
+
+```
+lean-projects/
+├── .lean-packages/          ← Mathlib + deps live here (shared, ~7.7 GB once)
+├── automated-proofs/        ← this template
+├── my-next-proof/           ← another project from this template
+└── yet-another-proof/       ← shares the same Mathlib, no extra download
+```
+
+On first `lake build` in a new project, Lake downloads Mathlib into `../.lean-packages/` if it isn't already there. Subsequent projects in the same folder reuse it — no re-download, no duplicate GBs.
+
+If you keep projects in different directories rather than siblings, update `packagesDir` in `lakefile.toml` and `lake-manifest.json` to point to wherever you want the shared cache to live.
