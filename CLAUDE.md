@@ -17,9 +17,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Install dependencies before running any scripts (Python 3.10+ required):
 
 ```bash
-pip install aristotlelib pathspec
+pip install aristotlelib pathspec python-dotenv
 # or with uv:
-uv pip install aristotlelib pathspec
+uv pip install aristotlelib pathspec python-dotenv
 ```
 
 Create `.env` in the project root:

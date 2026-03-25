@@ -10,6 +10,3 @@ results/
 my_theorems/
 reports/
 help_from_aristotle/
-AutomatedProofs/JEPA.lean
-AutomatedProofs/Lemmas.lean
-AutomatedProofs/OffDiagHelpers.lean
