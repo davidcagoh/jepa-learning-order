@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Show current project status: sorry counts, submissions in flight, last results.
 
-Run from the project root:
-    python scripts/status.py
+Run from the project subdirectory:
+    python ../scripts/status.py
 """
 
 import asyncio
@@ -12,7 +12,7 @@ import sys
 from datetime import datetime, timezone
 
 sys.path.insert(0, str(pathlib.Path(__file__).parent))
-from _common import load_env
+from _common import load_env, get_module_name
 
 from aristotlelib import Project, ProjectStatus, AristotleAPIError
 
@@ -38,13 +38,17 @@ def count_sorries(path: pathlib.Path) -> list[int]:
 
 
 def show_sorry_counts() -> int:
-    lean_files = sorted(pathlib.Path("AutomatedProofs").glob("**/*.lean"))
+    module_name = get_module_name()
+    lean_dir = pathlib.Path(module_name) if module_name != '.' else pathlib.Path('.')
+    lean_files = sorted(lean_dir.glob("**/*.lean"))
     if not lean_files:
-        print("  (no .lean files found in AutomatedProofs/)")
+        print(f"  (no .lean files found in {lean_dir}/)")
         return 0
 
     total = 0
     for f in lean_files:
+        if ".lake" in f.parts:
+            continue
         line_nums = count_sorries(f)
         n = len(line_nums)
         total += n

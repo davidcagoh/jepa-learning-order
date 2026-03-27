@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """Submit a Lean project to Aristotle, linked to a theorem paper.
 
-Usage:
-    python scripts/submit.py my_theorems/Paper.md "Fill in the sorries"
-    python scripts/submit.py my_theorems/Paper.md "Fill in the sorries" --project-dir .
-    python scripts/submit.py my_theorems/Paper.md "Fill in the sorries" --dry-run
+Usage (run from the project subdirectory):
+    python ../scripts/submit.py my_theorems/Paper.md "Fill in the sorries"
+    python ../scripts/submit.py my_theorems/Paper.md "Fill in the sorries" --dry-run
 
 The paper path is required as the first argument — it links this submission to its
-source so that  python scripts/retrieve.py  can find and annotate the right file
+source so that  python ../scripts/retrieve.py  can find and annotate the right file
 when the job completes.
 
 --dry-run  List files that would be packaged and exit without submitting.
@@ -200,7 +199,7 @@ async def main() -> None:
     print(f"Paper:      {paper}")
     print(f"Prompt:     {prompt}")
     print(f"\n→ Fill in justification: {doc_path}")
-    print(f"\nWhen Aristotle emails, run:  python scripts/retrieve.py")
+    print(f"\nWhen Aristotle emails, run:  python ../scripts/retrieve.py")
 
 
 asyncio.run(main())

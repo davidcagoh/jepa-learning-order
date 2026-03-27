@@ -1,69 +1,70 @@
-# automated-proofs
+# Lean 4 + Aristotle Proof Template
 
-A GitHub template for formalizing mathematical proofs in Lean 4 using [Aristotle](https://aristotle.harmonic.fun) — Harmonic's automated theorem proving service.
+A GitHub template for formalising mathematical proofs in Lean 4 using [Aristotle](https://aristotle.harmonic.fun) — an automated theorem prover by Harmonic.
 
-The workflow is human-assisted: a proof paper (markdown) is translated into a Lean skeleton, then submitted to Aristotle in iterative rounds until all `sorry` placeholders are filled. Tooling manages the submission/retrieval loop.
+The workflow: write a proof paper (markdown) → translate it into a Lean skeleton with `sorry` placeholders and `PROVIDED SOLUTION` docstrings → submit to Aristotle → retrieve filled proofs. Scripts manage the submission/retrieval loop.
 
-## Using this template
+## Quick start
 
-```bash
-# 1. Click "Use this template" on GitHub, name your repo, clone it
-git clone https://github.com/<you>/<your-repo> && cd <your-repo>
-
-# 2. Initialise: rename the Lean library, seed project dirs, squash template history
-python scripts/init.py <ProjectName>
-
-# 3. Add your Aristotle API key
-echo "ARISTOTLE_API_KEY=arstl_..." > .env
-
-# 4. Scaffold a new theorem from a paper
-# (uses the /new-theorem Claude Code skill)
-```
-
-## Setup
-
-Python 3.10+ and a Lean 4 toolchain are required.
+### 1. Install Python dependencies
 
 ```bash
 pip install aristotlelib pathspec python-dotenv
 ```
 
-## Scripts
-
-All scripts run from the project root.
+### 2. Add your Aristotle API key
 
 ```bash
-# One-time init after forking the template
-python scripts/init.py <ProjectName>
-
-# See current sorry count and submission status
-python scripts/status.py
-
-# Preview what would be packaged before submitting
-python scripts/submit.py my_theorems/Paper.md "Fill in the sorries" --dry-run
-
-# Submit to Aristotle
-python scripts/submit.py my_theorems/Paper.md "Fill in the sorries"
-
-# When Aristotle emails: download results and annotate the paper
-python scripts/retrieve.py
+echo "ARISTOTLE_API_KEY=arstl_..." > .env
 ```
 
-Annotated results are written to `reports/<PaperName>_annotated.md` with per-lemma callouts (✓ proved / ◑ proved vacuously / ⚠ needs revision).
+Get your key at [aristotle.harmonic.fun/dashboard](https://aristotle.harmonic.fun/dashboard).
 
-## What's automated vs. human-assisted
+### 3. Set up the shared Mathlib cache (saves ~7.7 GB on subsequent projects)
 
-| Step | Automated |
-|---|---|
-| Packaging and submitting to Aristotle | ✓ |
-| Polling status and downloading results | ✓ |
-| Annotating the paper with proof outcomes | ✓ |
-| Generating the initial Lean skeleton from a paper | `/new-theorem` skill (Claude Code) |
-| Diagnosing remaining sorries between rounds | Human |
-| Creating helper lemmas for Mathlib gaps | Human |
+Clone this repo **inside a dedicated parent folder**. Lake will download Mathlib (~7.7 GB) into `.lean-packages/` in that parent folder, and any other Lean projects you clone there will reuse it automatically.
+
+```bash
+mkdir ~/lean-projects
+cd ~/lean-projects
+git clone <this-repo-url>
+cd automated-proofs
+```
+
+```
+lean-projects/
+├── .lean-packages/        ← Mathlib lives here (downloaded once, ~7.7 GB)
+├── automated-proofs/      ← this repo
+└── another-proof/         ← reuses the same Mathlib, no re-download
+```
+
+No other setup needed — `lake build` handles the download on first run.
+
+### 4. Build
+
+```bash
+lake build
+```
+
+### 5. Run the workflow
+
+```bash
+python scripts/status.py                                               # check sorry counts
+python scripts/submit.py my_theorems/Paper.md "Fill in the sorries"   # submit to Aristotle
+python scripts/retrieve.py                                             # download results
+```
+
+See `CLAUDE.md` for the full workflow, Lean type conventions, and Aristotle tips.
+
+## Using this template
+
+1. Click **Use this template** → **Create a new repository**
+2. Clone your new repo
+3. Rename the module: update `name` and `defaultTargets` in `lakefile.toml`, rename `AutomatedProofs.lean` and the `AutomatedProofs/` directory, update all `import AutomatedProofs` references
+4. Follow the quick start above
 
 ## Lean environment
 
-- **Toolchain**: `leanprover/lean4:v4.28.0` (matches Aristotle's fixed version — no porting needed)
-- **Mathlib**: `v4.28.0` / commit `8f9d9cff6bd728b17a24e163c9402775d9e6a365`
-- **Entry point**: `<ProjectName>.lean` — add imports here in dependency order
+- **Toolchain**: `leanprover/lean4:v4.28.0`
+- **Mathlib**: `v4.28.0` (commit `8f9d9cff6bd728b17a24e163c9402775d9e6a365`)
+- Pinned to match Aristotle's fixed environment — returned proofs compile locally without porting.

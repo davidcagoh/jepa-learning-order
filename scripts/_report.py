@@ -1,14 +1,18 @@
 """Internal module: annotate a theorem paper with Aristotle proof results.
 
-Imported by retrieve.py. Not a user-facing script — run  python scripts/retrieve.py  instead.
+Imported by retrieve.py. Not a user-facing script — run  python ../scripts/retrieve.py  instead.
 """
 
 import json
 import pathlib
 import re
+import sys
 import tarfile
 import tempfile
 from datetime import datetime, timezone
+
+sys.path.insert(0, str(pathlib.Path(__file__).parent))
+from _common import get_module_name
 
 
 # ── Lean parsing ──────────────────────────────────────────────────────────────
@@ -255,7 +259,9 @@ def run(tar_path: pathlib.Path, paper_path: pathlib.Path) -> None:
         ]
 
     proved_map, remaining_map = parse_summary(summary_text)
-    local_map = local_sorry_map(pathlib.Path('AutomatedProofs'))
+    module_name = get_module_name()
+    lean_dir = pathlib.Path(module_name) if module_name != '.' else pathlib.Path('.')
+    local_map = local_sorry_map(lean_dir)
 
     for name, ref in result_sorry_map(result_lean_texts).items():
         if name not in local_map or (ref is not None and local_map[name] is None):
@@ -280,4 +286,4 @@ def run(tar_path: pathlib.Path, paper_path: pathlib.Path) -> None:
 
 
 if __name__ == '__main__':
-    print("This is an internal module. Run:  python scripts/retrieve.py")
+    print("This is an internal module. Run:  python ../scripts/retrieve.py")

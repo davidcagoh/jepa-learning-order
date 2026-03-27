@@ -3,11 +3,11 @@
 
 Run this after submitting (or any time you think a job might be done):
 
-    python scripts/retrieve.py
+    python ../scripts/retrieve.py
 
 For a specific project ID:
 
-    python scripts/retrieve.py <project-id>
+    python ../scripts/retrieve.py <project-id>
 
 For each completed job found, downloads the result and writes:
     reports/<PaperName>_annotated.md
@@ -113,7 +113,7 @@ async def main() -> None:
     meta_files = sorted(results_dir.glob("*.meta.json"))
     if not meta_files:
         print("No tracked jobs found in results/. Submit a paper first with:")
-        print('  python scripts/submit.py my_theorems/Paper.md "Fill in the sorries"')
+        print('  python ../scripts/submit.py my_theorems/Paper.md "Fill in the sorries"')
         sys.exit(0)
 
     print(f"Checking {len(meta_files)} tracked job(s)…\n")

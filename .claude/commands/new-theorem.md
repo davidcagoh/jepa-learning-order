@@ -4,6 +4,8 @@ Scaffold a new Lean theorem from a markdown paper and prepare it for Aristotle s
 
 **Usage:** `/new-theorem my_theorems/Paper.md`
 
+This skill works in any Lean project in this workspace. It reads `lakefile.toml` to determine the module name automatically.
+
 ---
 
 ## Steps
@@ -12,11 +14,15 @@ Scaffold a new Lean theorem from a markdown paper and prepare it for Aristotle s
 
 Read the markdown paper at `$ARGUMENTS`. If no argument is given, ask the user for the paper path.
 
-### 2. Infer the theorem name
+### 2. Determine the module name
+
+Read `lakefile.toml` to find the `[[lean_lib]] name = "..."` field — this is the Lean module name (e.g. `AutomatedProofs`, `SimplicialLatentGeometry`). Use this throughout.
+
+### 3. Infer the theorem name
 
 Derive a `CamelCase` Lean module name from the paper title or filename (e.g. `JEPA_Proof_Lecture.md` → `JEPA`, a paper titled "Convergence of SGD" → `SGDConvergence`). Show the inferred name and ask the user to confirm or correct it before proceeding.
 
-### 3. Identify the proof structure
+### 4. Identify the proof structure
 
 Read the paper carefully and identify:
 - All **definitions** (structures, defs)
@@ -31,14 +37,14 @@ Before writing any files, briefly summarise to the user:
 
 Ask the user to confirm this structure before writing files.
 
-### 4. Write the Lean skeleton
+### 5. Write the Lean skeleton
 
-Create `AutomatedProofs/<TheoremName>.lean` following this structure exactly:
+Create `<Module>/<TheoremName>.lean` following this structure exactly:
 
 ```lean
 import Mathlib
--- import AutomatedProofs.Lemmas         -- uncomment if helper lemmas exist
--- import AutomatedProofs.<Name>Helpers  -- uncomment if bridging helpers exist
+-- import <Module>.Lemmas         -- uncomment if helper lemmas exist
+-- import <Module>.<Name>Helpers  -- uncomment if bridging helpers exist
 
 set_option linter.style.longLine false
 set_option linter.style.whitespace false
@@ -77,20 +83,20 @@ lemma my_lemma ... : ... := by
   sorry
 ```
 
-**Lean type conventions to follow** (from CLAUDE.md):
+**Lean type conventions to follow** (see parent CLAUDE.md):
 - `Matrix (Fin d) (Fin d) ℝ` for d×d real matrices
 - `Real.rpow x r` for non-integer real exponents — **never** `x ^ (n / m)` where `n m : ℕ` (integer division truncates)
 - `open scoped Matrix` at top if transpose notation `Mᵀ` is needed
 - `dotProduct u v` (top-level, not `Matrix.dotProduct`)
 - `‖M‖` for operator norm, `inner u v` for inner product
 
-If a helper file is needed, create it at `AutomatedProofs/<Name>Helpers.lean` with the same sorry+PROVIDED SOLUTION pattern.
+If a helper file is needed, create it at `<Module>/<Name>Helpers.lean` with the same sorry+PROVIDED SOLUTION pattern.
 
-### 5. Update AutomatedProofs.lean
+### 6. Update the entry file
 
-Add the new import(s) to `AutomatedProofs.lean` in dependency order. Read the current file first, then insert — never clobber existing imports. Helper files must appear before the file that imports them.
+Add the new import(s) to `<Module>.lean` in dependency order. Read the current file first, then insert — never clobber existing imports. Helper files must appear before the file that imports them.
 
-### 6. Run the dry-run
+### 7. Run the dry-run
 
 Run:
 ```bash
@@ -99,7 +105,7 @@ python scripts/submit.py $ARGUMENTS "Fill in all the sorries" --dry-run
 
 Show the full output to the user (file list with sizes).
 
-### 7. Review scope with the user
+### 8. Review scope with the user
 
 After the dry-run, run:
 ```bash
@@ -116,21 +122,21 @@ Then ask the user these three questions explicitly. **Wait for answers before pr
    - If splitting, which lemmas should go in the first submission?
 
 3. **Proof difficulty** — For each sorry, is it:
-   - Mechanical/algebraic (Aristotle handles well — ring, linarith, omega, norm_num)
+   - Mechanical/algebraic (Aristotle handles well — `ring`, `linarith`, `omega`, `norm_num`)
    - ODE/integral argument (needs a detailed PROVIDED SOLUTION with explicit steps)
    - Genuinely novel (may need multiple Aristotle rounds)
 
-   If any sorrys have thin PROVIDED SOLUTION blocks, offer to flesh them out now.
+   If any sorries have thin PROVIDED SOLUTION blocks, offer to flesh them out now.
 
-### 8. Offer to submit
+### 9. Offer to submit
 
 Once the user has answered and you've made any adjustments (splitting files, enriching PROVIDED SOLUTIONs), ask:
 
 > "Scope looks good. What prompt should I use? Or I can suggest one based on the sorries."
 
 Suggest a focused prompt if the user wants one, e.g.:
-- `"Fill in the sorries in AutomatedProofs/<TheoremName>.lean"` (single file)
-- `"Fill in the sorries in AutomatedProofs/<TheoremName>.lean. Focus on <LemmaA> and <LemmaB>. Each has a detailed PROVIDED SOLUTION."` (targeted)
+- `"Fill in the sorries in <Module>/<TheoremName>.lean"` (single file)
+- `"Fill in the sorries in <Module>/<TheoremName>.lean. Focus on <LemmaA> and <LemmaB>. Each has a detailed PROVIDED SOLUTION."` (targeted)
 
 Then, with the user's confirmed prompt, run:
 ```bash
