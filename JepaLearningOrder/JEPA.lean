@@ -1,6 +1,6 @@
 import Mathlib
-import AutomatedProofs.Lemmas
-import AutomatedProofs.OffDiagHelpers
+import JepaLearningOrder.Lemmas
+import JepaLearningOrder.OffDiagHelpers
 
 /-!
 # JEPA Learns Influential Features First
@@ -520,7 +520,7 @@ set_option maxHeartbeats 400000 in
     PROVIDED SOLUTION
     Step 1: From h_ode, c_{rs} satisfies ċ_{rs} = -κ·P_{rs}(t)·c_{rs} + g(t) with |g(t)| ≤ C·ε^{(2L-1)/L},
             where κ = ρ_r*(ρ_r* - ρ_s*)·μ_s > 0 (since ρ_r* > ρ_s* and ρ_s*, μ_s > 0).
-    Step 2: Apply gronwall_approx_ode_bound (AutomatedProofs.Lemmas) to f = c_{rs}:
+    Step 2: Apply gronwall_approx_ode_bound (JepaLearningOrder.Lemmas) to f = c_{rs}:
             α(t) = κ · preconditioner L (sigma_r t) (sigma_s t) ≥ 0,
             η = C · ε^{(2L-1)/L},
             f₀ = C₀ · ε^{1/L} (from h_init),

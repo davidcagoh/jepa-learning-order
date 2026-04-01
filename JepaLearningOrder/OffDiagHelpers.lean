@@ -1,5 +1,5 @@
 import Mathlib
-import AutomatedProofs.Lemmas
+import JepaLearningOrder.Lemmas
 
 set_option linter.style.longLine false
 set_option linter.style.whitespace false

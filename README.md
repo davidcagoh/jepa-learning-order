@@ -28,13 +28,13 @@ Clone this repo **inside a dedicated parent folder**. Lake will download Mathlib
 mkdir ~/lean-projects
 cd ~/lean-projects
 git clone <this-repo-url>
-cd automated-proofs
+cd jepa-learning-order
 ```
 
 ```
 lean-projects/
 ├── .lean-packages/        ← Mathlib lives here (downloaded once, ~7.7 GB)
-├── automated-proofs/      ← this repo
+├── jepa-learning-order/      ← this repo
 └── another-proof/         ← reuses the same Mathlib, no re-download
 ```
 
@@ -60,7 +60,7 @@ See `CLAUDE.md` for the full workflow, Lean type conventions, and Aristotle tips
 
 1. Click **Use this template** → **Create a new repository**
 2. Clone your new repo
-3. Rename the module: update `name` and `defaultTargets` in `lakefile.toml`, rename `AutomatedProofs.lean` and the `AutomatedProofs/` directory, update all `import AutomatedProofs` references
+3. Rename the module: update `name` and `defaultTargets` in `lakefile.toml`, rename `JepaLearningOrder.lean` and the `JepaLearningOrder/` directory, update all `import JepaLearningOrder` references
 4. Follow the quick start above
 
 ## Lean environment

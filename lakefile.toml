@@ -1,7 +1,7 @@
-name = "automated-proofs"
+name = "jepa-learning-order"
 version = "0.1.0"
 keywords = ["math"]
-defaultTargets = ["AutomatedProofs"]
+defaultTargets = ["JepaLearningOrder"]
 packagesDir = "../.lean-packages"
 
 [leanOptions]
@@ -17,4 +17,4 @@ rev = "v4.28.0"
 git = "https://github.com/leanprover-community/mathlib4.git"
 
 [[lean_lib]]
-name = "AutomatedProofs"
+name = "JepaLearningOrder"
