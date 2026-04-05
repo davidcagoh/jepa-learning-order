@@ -352,3 +352,147 @@ lemma gronwall_approx_ode_bound
         have h_exp := Real.one_le_exp hA
         have h_nn : 0 ≤ f₀ + T * η := by positivity
         nlinarith [mul_le_mul_of_nonneg_left h_exp h_nn]
+
+/-! ## Section 3: Contractive Grönwall Inequality -/
+
+/-
+**Contractive Grönwall bound (steady-state tracking).**
+
+    If f : [0, T] → ℝ is continuous, non-negative, and satisfies
+    f'(t) ≤ -λ · f(t) + D for constants λ > 0 and D ≥ 0,
+    then f(t) ≤ f(0) + D / λ for all t ∈ [0, T].
+
+    This is the key bound for Phase B of the quasi-static tracking argument:
+    the contraction rate λ (from the positive-definite lower bound on W̄ Σˣˣ W̄ᵀ)
+    dominates the drift D (from the slow encoder motion), yielding a steady-state
+    error of D / λ.
+
+    The tighter bound is f(t) ≤ f(0) · exp(-λt) + (D/λ)(1 - exp(-λt)),
+    which is ≤ f(0) + D/λ since exp(-λt) ≤ 1 for t ≥ 0.
+-/
+lemma contractive_gronwall_bound
+    {T : ℝ} (hT : 0 < T)
+    {f : ℝ → ℝ} {lam D : ℝ}
+    (hlam : 0 < lam) (hD : 0 ≤ D)
+    (hf_cont : ContinuousOn f (Set.Icc 0 T))
+    (hf_nn : ∀ t ∈ Set.Icc 0 T, 0 ≤ f t)
+    (hf_deriv : ∀ t ∈ Set.Ico 0 T,
+      ∃ f' : ℝ, HasDerivAt f f' t ∧ f' ≤ -lam * f t + D) :
+    ∀ t ∈ Set.Icc 0 T, f t ≤ f 0 + D / lam := by
+  intro t ht; by_cases h_cases : t = 0; simp_all +decide [ div_neg, neg_div ] ;
+  · positivity;
+  · have h_le_contractive : f t ≤ f 0 * Real.exp (-lam * t) + (D / lam) * (1 - Real.exp (-lam * t)) := by
+      have h_le_contractive : ∀ t ∈ Set.Ioo 0 T, deriv (fun t => (f t - D / lam) * Real.exp (lam * t)) t ≤ 0 := by
+        intro t ht; obtain ⟨ f', hf', hf'' ⟩ := hf_deriv t ⟨ ht.1.le, ht.2 ⟩ ; norm_num [ hf'.differentiableAt, mul_comm lam ] ; ring_nf ;
+        rw [ hf'.deriv ] ; nlinarith [ mul_inv_cancel_left₀ hlam.ne' ( Real.exp ( t * lam ) * D ), Real.exp_pos ( t * lam ) ];
+      -- Apply the mean value theorem to the interval $[0, t]$.
+      obtain ⟨c, hc⟩ : ∃ c ∈ Set.Ioo 0 t, deriv (fun t => (f t - D / lam) * Real.exp (lam * t)) c = ( (f t - D / lam) * Real.exp (lam * t) - (f 0 - D / lam) * Real.exp (lam * 0) ) / (t - 0) := by
+        apply_rules [ exists_deriv_eq_slope ];
+        · exact lt_of_le_of_ne ht.1 ( Ne.symm h_cases );
+        · exact ContinuousOn.mul ( ContinuousOn.sub ( hf_cont.mono ( Set.Icc_subset_Icc le_rfl ht.2 ) ) continuousOn_const ) ( Continuous.continuousOn ( Real.continuous_exp.comp ( continuous_const.mul continuous_id' ) ) );
+        · exact fun x hx => DifferentiableAt.differentiableWithinAt ( by obtain ⟨ f', hf', hf'' ⟩ := hf_deriv x ⟨ hx.1.le, hx.2.trans_le ht.2 ⟩ ; exact DifferentiableAt.mul ( DifferentiableAt.sub ( hf'.differentiableAt ) ( differentiableAt_const _ ) ) ( DifferentiableAt.exp ( differentiableAt_id.const_mul _ ) ) );
+      have := h_le_contractive c ⟨ hc.1.1, hc.1.2.trans_le ht.2 ⟩ ; rw [ hc.2, div_le_iff₀ ] at this <;> norm_num [ Real.exp_neg ] at * <;> try linarith [ hc.1.1, hc.1.2 ] ;
+      field_simp;
+      nlinarith [ mul_div_cancel₀ D hlam.ne', Real.exp_pos ( lam * t ), Real.add_one_le_exp ( lam * t ), mul_le_mul_of_nonneg_left ( Real.add_one_le_exp ( lam * t ) ) hlam.le ];
+    nlinarith [ hf_nn 0 ( by norm_num; linarith ), Real.exp_pos ( -lam * t ), Real.exp_le_one_iff.mpr ( show -lam * t ≤ 0 by nlinarith [ ht.1, ht.2 ] ), div_nonneg hD hlam.le ]
+
+/-! ## Section 4: Exponential Decay Form of the Contractive Grönwall Inequality -/
+
+/-- **Contractive Grönwall decay (exponential form).**
+    If f : [0, T] → ℝ is continuous, non-negative, and satisfies
+    f'(t) ≤ -λ·f(t) + D for λ > 0 and D ≥ 0, then:
+      f(t) ≤ f(0)·exp(-λt) + (D/λ)·(1 - exp(-λt))  for all t ∈ [0, T].
+
+    This is the tight exponential-decay form of the Gronwall bound. The weaker
+    `contractive_gronwall_bound` follows immediately (since exp(-λt) ≤ 1 and
+    (1-exp(-λt)) ≤ 1).
+
+    **Key application: `frozen_encoder_convergence`.** When D = 0 (frozen encoder,
+    no drift), this reduces to f(t) ≤ f(0)·exp(-λt), giving true exponential decay.
+    At τ_A = (2(L-1)/L)/λ · log(1/ε), exp(-λ·τ_A) = ε^{2(L-1)/L}, so
+    f(τ_A) ≤ f(0) · ε^{2(L-1)/L} = O(ε^{1/L}) · ε^{2(L-1)/L} = O(ε^{(2L-1)/L}).
+
+    PROVIDED SOLUTION
+    Step 1: Define g(t) = (f(t) - D/λ)·exp(λt). Compute g'(t) ≤ 0 using f'(t) ≤ -λf(t)+D.
+    Step 2: By MVT (as in contractive_gronwall_bound), g(t) ≤ g(0) for all t ∈ [0,T].
+    Step 3: g(0) = f(0) - D/λ. Multiply g(t) ≤ g(0) by exp(-λt) > 0 and rearrange:
+            f(t) - D/λ ≤ (f(0) - D/λ)·exp(-λt).
+    Step 4: Add D/λ to both sides:
+            f(t) ≤ f(0)·exp(-λt) + (D/λ)·(1 - exp(-λt)).
+    Note: this is exactly the `h_le_contractive` intermediate from `contractive_gronwall_bound`
+    promoted to the conclusion. -/
+lemma contractive_gronwall_decay
+    {T : ℝ} (hT : 0 < T)
+    {f : ℝ → ℝ} {lam D : ℝ}
+    (hlam : 0 < lam) (hD : 0 ≤ D)
+    (hf_cont : ContinuousOn f (Set.Icc 0 T))
+    (hf_nn : ∀ t ∈ Set.Icc 0 T, 0 ≤ f t)
+    (hf_deriv : ∀ t ∈ Set.Ico 0 T,
+      ∃ f' : ℝ, HasDerivAt f f' t ∧ f' ≤ -lam * f t + D) :
+    ∀ t ∈ Set.Icc 0 T,
+      f t ≤ f 0 * Real.exp (-lam * t) + (D / lam) * (1 - Real.exp (-lam * t)) := by
+  intro t ht
+  by_cases ht0 : t = 0;
+  · aesop;
+  · obtain ⟨c, hc⟩ : ∃ c ∈ Set.Ioo 0 t, deriv (fun x => (f x - D / lam) * Real.exp (lam * x)) c = ( (f t - D / lam) * Real.exp (lam * t) - (f 0 - D / lam) * Real.exp (lam * 0) ) / (t - 0) := by
+      apply_rules [ exists_deriv_eq_slope ];
+      · exact lt_of_le_of_ne ht.1 ( Ne.symm ht0 );
+      · exact ContinuousOn.mul ( ContinuousOn.sub ( hf_cont.mono ( Set.Icc_subset_Icc le_rfl ht.2 ) ) continuousOn_const ) ( Continuous.continuousOn ( Real.continuous_exp.comp ( continuous_const.mul continuous_id' ) ) );
+      · exact fun x hx => DifferentiableAt.differentiableWithinAt ( by obtain ⟨ f', hf', hf'' ⟩ := hf_deriv x ⟨ hx.1.le, hx.2.trans_le ht.2 ⟩ ; exact DifferentiableAt.mul ( DifferentiableAt.sub ( hf'.differentiableAt ) ( differentiableAt_const _ ) ) ( DifferentiableAt.exp ( differentiableAt_id.const_mul _ ) ) );
+    have h_deriv_nonpos : deriv (fun x => (f x - D / lam) * Real.exp (lam * x)) c ≤ 0 := by
+      have := hf_deriv c ⟨ hc.1.1.le, hc.1.2.trans_le ht.2 ⟩ ; obtain ⟨ f', hf', hf'' ⟩ := this; norm_num [ hf'.differentiableAt, mul_comm lam ] at *;
+      rw [ hf'.deriv ] ; nlinarith [ Real.exp_pos ( c * lam ), mul_div_cancel₀ D hlam.ne' ];
+    simp_all +decide [ Real.exp_neg, mul_comm lam ];
+    field_simp;
+    rw [ div_le_iff₀ ( by linarith ) ] at h_deriv_nonpos ; nlinarith [ mul_div_cancel₀ D hlam.ne', Real.exp_pos ( t * lam ) ]
+
+/-! ## Section 5: Spectral quadratic bound via norm condition -/
+
+/-
+Spectral quadratic lower bound: if norm(A*v)^2 >= c^2 * norm(v)^2 for all v
+and A is PD, then v^T A v >= c * v^T v.
+Proof via spectral theorem: all eigenvalues of A are at least c.
+-/
+set_option maxHeartbeats 800000 in
+lemma pd_quadratic_from_norm_bound {d : ℕ}
+    (A : Matrix (Fin d) (Fin d) ℝ) (hA : A.PosDef)
+    (c : ℝ) (hc : 0 < c)
+    (h : ∀ v : Fin d → ℝ,
+      dotProduct (A.mulVec v) (A.mulVec v) ≥ c ^ 2 * dotProduct v v) :
+    ∀ v : Fin d → ℝ, dotProduct v (A.mulVec v) ≥ c * dotProduct v v := by
+  have h_eigenvalues : ∀ (v : Fin d → ℝ), dotProduct (A.mulVec v) (A.mulVec v) ≥ c ^ 2 * dotProduct v v := by
+    assumption;
+  obtain ⟨Q, Λ, hQ, hΛ⟩ : ∃ Q : Matrix (Fin d) (Fin d) ℝ, ∃ Λ : Fin d → ℝ, Q.transpose * Q = 1 ∧ A = Q * Matrix.diagonal Λ * Q.transpose ∧ ∀ i, 0 < Λ i := by
+    have := Matrix.IsHermitian.spectral_theorem hA.1;
+    refine' ⟨ _, _, _, this, _ ⟩;
+    · ext i j ; simp +decide [ Matrix.mul_apply, Matrix.transpose_apply ];
+      have := hA.1.eigenvectorBasis.orthonormal; simp +decide [ orthonormal_iff_ite ] at this;
+      convert this i j using 1;
+      exact Finset.sum_congr rfl fun _ _ => mul_comm _ _;
+    · exact fun i => hA.eigenvalues_pos i;
+  have h_lambda_ge_c : ∀ i, Λ i ≥ c := by
+    intro i
+    have h_lambda_i_ge_c : dotProduct (A.mulVec (Q.mulVec (Pi.single i 1))) (A.mulVec (Q.mulVec (Pi.single i 1))) ≥ c ^ 2 * dotProduct (Q.mulVec (Pi.single i 1)) (Q.mulVec (Pi.single i 1)) := by
+      exact h_eigenvalues _;
+    have hQ_mulVec : A.mulVec (Q.mulVec (Pi.single i 1)) = Λ i • Q.mulVec (Pi.single i 1) := by
+      ext j; simp +decide [ hΛ, Matrix.mulVec, dotProduct ] ;
+      simp +decide [ Matrix.mul_apply, mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _, Pi.single_apply ];
+      simp +decide [ Matrix.diagonal, Finset.sum_ite, Finset.filter_eq', Finset.filter_ne' ];
+      rw [ Finset.sum_comm ];
+      simp +decide [ ← mul_assoc, ← Finset.mul_sum _ _ _, ← Finset.sum_mul, ← Matrix.ext_iff ] at hQ ⊢;
+      simp_all +decide [ Matrix.mul_apply, Matrix.one_apply ];
+      simp_all +decide [ ← Finset.mul_sum _ _ _, ← Finset.sum_mul, mul_assoc ];
+    simp_all +decide [ mul_assoc, mul_left_comm, mul_comm, dotProduct ];
+    simp_all +decide [ ← mul_assoc, ← Finset.sum_mul _ _ _ ];
+    contrapose! h_lambda_i_ge_c;
+    rw [ mul_assoc, mul_comm ];
+    exact mul_lt_mul_of_pos_right ( by nlinarith [ hΛ.2 i ] ) ( lt_of_le_of_ne ( Finset.sum_nonneg fun _ _ => mul_self_nonneg _ ) ( Ne.symm <| by intro H; have := congr_fun ( congr_fun hQ i ) i; simp_all +decide [ Matrix.mul_apply, Finset.sum_eq_zero_iff_of_nonneg, mul_self_nonneg ] ) );
+  intro v
+  have h_diag : dotProduct v (A.mulVec v) = dotProduct (Q.transpose.mulVec v) (Matrix.diagonal Λ |> Matrix.mulVec <| Q.transpose.mulVec v) := by
+    simp +decide [ hΛ, Matrix.mul_assoc, Matrix.dotProduct_mulVec, Matrix.vecMul_mulVec ];
+  have h_diag : dotProduct (Q.transpose.mulVec v) (Matrix.diagonal Λ |> Matrix.mulVec <| Q.transpose.mulVec v) ≥ c * dotProduct (Q.transpose.mulVec v) (Q.transpose.mulVec v) := by
+    simp_all +decide [ Matrix.mulVec, dotProduct ];
+    rw [ Finset.mul_sum _ _ _ ] ; exact Finset.sum_le_sum fun i _ => by simpa [ Matrix.diagonal ] using by nlinarith only [ h_lambda_ge_c i, sq_nonneg ( ∑ j, Q j i * v j ) ] ;
+  simp_all +decide [ Matrix.mul_assoc, Matrix.dotProduct_mulVec, Matrix.vecMul_mulVec ];
+  rw [ mul_eq_one_comm.mp hQ ] at h_diag ; aesop
+
