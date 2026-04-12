@@ -799,92 +799,121 @@ lemma contraction_ode_structure {d : ℕ} (hd : 0 < d) (dat : JEPAData d)
 /-- **Lemma (Frozen-encoder Phase A convergence).**
     When W̄ is held fixed at W₀ and V evolves under the decoder gradient flow
     V̇(t) = -gradV dat W₀ (V t), the tracking error f(t) = ‖V(t) - V_qs(W₀)‖_F
-    decays exponentially. Starting from ‖V(0)‖_F ≤ K₀·ε^{1/L} and with the
-    Frobenius PD lower bound ‖M·(W₀ Σˣˣ W₀ᵀ)‖_F ≥ c₀·ε^{2/L}·‖M‖_F, after
-    the logarithmic Phase A time
+    decays exponentially. Starting from ‖V(0)‖_F ≤ K₀·ε^{1/L} and ‖V_qs(W₀)‖_F ≤ K_qs·ε^{1/L}
+    (from `hK_qs`), with the Frobenius PD lower bound ‖M·(W₀ Σˣˣ W₀ᵀ)‖_F ≥ c₀·ε^{2/L}·‖M‖_F,
+    after the logarithmic Phase A time
 
         τ_A = (2(L-1)/L) / c₀ · ε^{-2/L} · log(1/ε)
 
-    the tracking error satisfies f(τ_A) ≤ C_A · ε^{2(L-1)/L}.
+    the tracking error satisfies
+        f(τ_A) ≤ (K₀ + K_qs) · ε^{2(L-1)/L}.
+
+    The constant K₀ + K_qs is ε-independent (both bounds from problem data); this is the
+    genuine reformulation replacing the previous vacuous existential witness.
 
     This lemma discharges hypothesis (R1) `hPhaseA` of `JEPA_rho_ordering`.
 
     PROVIDED SOLUTION
 
-    Let ΔV(t) = V(t) - quasiStaticDecoder dat W₀ (constant since W₀ is fixed).
+    Let f(t) = matFrobNorm(V(t) - quasiStaticDecoder dat W₀).
+    Let ΔV(t) = V(t) - quasiStaticDecoder dat W₀ (the quasi-static decoder is constant
+    since W₀ is fixed throughout Phase A).
 
-    Step 1: Compute ΔV̇. Since quasiStaticDecoder dat W₀ is constant (W₀ fixed),
-            d/dt[quasiStaticDecoder dat W₀] = 0. Using hV_flow_ode:
+    Step 1: Compute the ODE for ΔV(t). Since d/dt[quasiStaticDecoder dat W₀] = 0:
             ΔV̇(t) = V̇(t) = -gradV dat W₀ (V t).
-            By gradV_eq_delta_mul_A (with A = W₀ Σˣˣ W₀ᵀ invertible from hPD_lower):
-            gradV dat W₀ V = (V - quasiStaticDecoder dat W₀) * A = ΔV * A.
-            So ΔV̇ = -ΔV * A.
+            By the identity gradV dat W₀ V = (V - quasiStaticDecoder dat W₀) * (W₀ * Σˣˣ * W₀ᵀ)
+            (this is the linearisation around the quasi-static decoder; use gradV_eq_delta_mul_A
+            from Basic.lean or unfold gradV directly):
+            ΔV̇(t) = -ΔV(t) * (W₀ * dat.SigmaXX * W₀ᵀ).
+            Let A := W₀ * dat.SigmaXX * W₀ᵀ (constant positive-semidefinite matrix).
 
-    Step 2: HasDerivAt for f(t) = matFrobNorm(ΔV(t)).
-            ΔV is differentiable with derivative -ΔV * A (from hV_flow_ode).
-            Apply hasDerivAt_matFrobNorm_of_ne_zero (using hDelta_nz):
-            f'(t) = ⟨ΔV, ΔV̇⟩_F / f(t) = -⟨ΔV, ΔV·A⟩_F / f(t).
+    Step 2: Derive the scalar ODE for f(t) when ΔV(t) ≠ 0.
+            Extract the c₀ and the uniform lower bound from hPD_lower:
+            obtain ⟨c₀, hc₀, hPD⟩ := hPD_lower.
+            Set lam := c₀ * epsilon ^ ((2 : ℝ) / L). Then lam > 0.
+            On the set where ΔV(t) ≠ 0, apply hasDerivAt_matFrobNorm_of_ne_zero
+            (using hDelta_nz for t ∈ Set.Ico 0 τ_A):
+            f'(t) = ⟨ΔV(t), ΔV̇(t)⟩_F / f(t)
+                  = -⟨ΔV(t), ΔV(t) * A⟩_F / f(t).
+            By hPD applied to M = ΔV(t): ⟨ΔV, ΔV * A⟩_F ≥ lam * f(t)^2.
+            Dividing by f(t) > 0: f'(t) ≤ -lam * f(t).
+            This is a pure contraction (drift D = 0).
 
-    Step 3: Bound f'(t). By uniform_frob_contraction applied to W₀ (constant):
-            ∃ lam > 0 s.t. ⟨ΔV, ΔV·A⟩_F ≥ lam * ‖ΔV‖_F².
-            So f'(t) ≤ -lam * f(t). This is a pure contraction (D = 0).
+    Step 3: Apply contractive_gronwall_decay (Lemmas.lean, Section 4) with D = 0.
+            Hypotheses:
+            - hT := hτ_A (τ_A > 0)
+            - hlam := lam > 0
+            - hD := le_refl 0
+            - hf_cont: f is continuous on [0, τ_A] from hV_flow_ode + matrix operations
+            - hf_nn: f(t) ≥ 0 by Real.sqrt_nonneg
+            - hf_deriv: for t ∈ Set.Ico 0 τ_A, f'(t) ≤ -lam * f(t) + 0 (from Step 2)
+            Conclusion: ∀ t ∈ [0, τ_A], f(t) ≤ f(0) * Real.exp(-lam * t).
 
-    Step 4: Apply contractive_gronwall_decay (Lemmas.lean Section 4) with D = 0:
-            f(t) ≤ f(0) * Real.exp(-lam * t).
-            (hf_cont: from hV_flow_ode + continuity; hf_nn: from Real.sqrt_nonneg.)
+    Step 4: Bound f(0) using triangle inequality.
+            f(0) = matFrobNorm(V 0 - quasiStaticDecoder dat W₀)
+                 ≤ matFrobNorm(V 0) + matFrobNorm(quasiStaticDecoder dat W₀).
+            From hV_init: obtain ⟨K₀, hK₀, hV₀⟩. So matFrobNorm(V 0) ≤ K₀ * ε^{1/L}.
+            From hK_qs: obtain ⟨K_qs, hK_qs_pos, hVqs₀⟩. So matFrobNorm(V_qs(W₀)) ≤ K_qs * ε^{1/L}.
+            Therefore f(0) ≤ (K₀ + K_qs) * epsilon ^ ((1 : ℝ) / L).
 
-    Step 5: Bound f(0). From hV_init: ‖V(0)‖_F ≤ K₀ ε^{1/L}.
-            From hVqs_bound: ‖V_qs(W₀)‖_F ≤ K_qs · ε^{1/L} (quasi-static decoder
-            has the same scale as W₀ by the formula W₀ Σʸˣ W₀ᵀ · (W₀ Σˣˣ W₀ᵀ)⁻¹).
-            Triangle inequality: f(0) ≤ (K₀ + K_qs) · ε^{1/L}.
+    Step 5: Evaluate at t = τ_A using hτ_A_def to connect τ_A with ε.
+            Extract ⟨c₀', hc₀', hτ⟩ := hτ_A_def. Use c₀ = c₀' (both from hPD_lower, same bound).
+            lam * τ_A = c₀ * ε^{2/L} * [(2(L-1)/L) / c₀ * ε^{-2/L} * log(1/ε)]
+                      = (2(L-1)/L) * log(1/ε).
+            Real.exp(-lam * τ_A) = Real.exp(-(2(L-1)/L) * log(1/ε))
+                                  = (1/ε)^{-(2(L-1)/L)}
+                                  = ε^{2(L-1)/L}.
+            Rewrite using Real.exp_log (heps > 0) and Real.rpow_natCast or Real.exp_mul_log.
+            Key: Real.exp (-(2 * ((L:ℝ) - 1) / L) * Real.log (1 / epsilon)) = epsilon ^ (2 * ((L:ℝ) - 1) / L).
+            Proof: exp(a * log(1/ε)) = (1/ε)^a = ε^{-a}, so exp(-a * log(1/ε)) = ε^a.
+            Use Real.rpow_def_of_pos heps and Real.log_inv.
 
-    Step 6: Choose τ_A = (2(L-1)/L) / lam · ε^{-2/L} · Real.log(1/epsilon).
-            Then lam * τ_A = (2(L-1)/L) * Real.log(1/epsilon).
-            Real.exp(-lam * τ_A) = Real.exp(-(2(L-1)/L) * Real.log(1/epsilon))
-                                  = epsilon ^ (2(L-1)/L).
-            (Use Real.exp_log and rpow_natCast to convert.)
-            f(τ_A) ≤ (K₀ + K_qs) · ε^{1/L} · ε^{2(L-1)/L}
-                   = (K₀ + K_qs) · ε^{(2L-1)/L}.
-            Since (2L-1)/L ≥ 2(L-1)/L for L ≥ 2 (as (2L-1)/L = 2 - 1/L ≥ 2(L-1)/L = 2 - 2/L
-            iff 1/L ≤ 2/L iff 1 ≤ 2, true), set C_A = K₀ + K_qs.
+    Step 6: Combine Steps 3–5.
+            f(τ_A) ≤ f(0) * Real.exp(-lam * τ_A)
+                   ≤ (K₀ + K_qs) * ε^{1/L} * ε^{2(L-1)/L}
+                   = (K₀ + K_qs) * ε^{(2L-1)/L}.
+            Since (2L-1)/L ≥ 2(L-1)/L for L ≥ 2 (both equal 2 - 1/L vs 2 - 2/L; since 1/L ≤ 2/L),
+            we have ε^{(2L-1)/L} ≤ ε^{2(L-1)/L} (because ε < 1).
+            So f(τ_A) ≤ (K₀ + K_qs) * ε^{2(L-1)/L}.
+            Witness C_A := K₀ + K_qs.
+            Use Real.rpow_le_rpow_of_exponent_le (heps_small.le) and exponent comparison.
 
-    Note: hDelta_nz holds throughout [0, τ_A] because exponential decay of ΔV
-    means it can only be zero if f(0) = 0, which would make V(0) = V_qs(W₀);
-    this would force the tracking error to stay 0, consistent with 0 ≤ 0.
-    Handle the zero case separately (f(0) = 0 → f(t) = 0 ≤ any C_A·ε^{2(L-1)/L}). -/
+    Step 7: Handle the zero case separately.
+            If f(0) = 0 then ΔV(0) = 0 (V(0) = V_qs(W₀)) and by uniqueness of ODE solutions
+            ΔV(t) = 0 for all t, so f(τ_A) = 0 ≤ (K₀ + K_qs) * ε^{2(L-1)/L}.
+            In practice: if matFrobNorm(V 0 - quasiStaticDecoder dat W₀) = 0, then
+            contractive_gronwall_decay gives f(τ_A) ≤ 0 * exp(...) + 0 = 0. -/
 lemma frozen_encoder_convergence {d : ℕ} (hd : 0 < d) (dat : JEPAData d)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     -- Fixed encoder W₀ (Phase A: frozen)
     (W₀ : Matrix (Fin d) (Fin d) ℝ)
-    -- Initial bound on V
+    -- Explicit ε-independent constants (K₀ + K_qs is the final bound constant)
+    (K₀ K_qs : ℝ) (hK₀ : 0 < K₀) (hK_qs_pos : 0 < K_qs)
+    -- Initial bound on V (‖V(0)‖_F ≤ K₀ · ε^{1/L})
     (V : ℝ → Matrix (Fin d) (Fin d) ℝ)
-    (hV_init : ∃ K₀ : ℝ, 0 < K₀ ∧
-        matFrobNorm (V 0) ≤ K₀ * epsilon ^ ((1 : ℝ) / L))
+    (hV_init : matFrobNorm (V 0) ≤ K₀ * epsilon ^ ((1 : ℝ) / L))
+    -- Quasi-static decoder norm bound (‖V_qs(W₀)‖_F ≤ K_qs · ε^{1/L}); the quasi-static decoder
+    -- V_qs(W₀) = W₀ Σʸˣ W₀ᵀ (W₀ Σˣˣ W₀ᵀ)⁻¹ scales like W₀ (order ε^{1/L}), so K_qs depends
+    -- only on the spectral norms of Σˣˣ and Σʸˣ, not on ε.
+    (hK_qs : matFrobNorm (quasiStaticDecoder dat W₀) ≤ K_qs * epsilon ^ ((1 : ℝ) / L))
     -- V satisfies the frozen-encoder gradient flow on [0, τ_A]
     (τ_A : ℝ) (hτ_A : 0 < τ_A)
     (hV_flow_ode : ∀ t ∈ Set.Icc 0 τ_A,
         HasDerivAt V (-(gradV dat W₀ (V t))) t)
-    -- Frobenius PD lower bound (same as in contraction_ode_structure)
-    (hPD_lower : ∃ c₀ : ℝ, 0 < c₀ ∧
-        ∀ M : Matrix (Fin d) (Fin d) ℝ,
-          matFrobNorm (M * (W₀ * dat.SigmaXX * W₀ᵀ)) ≥
-            c₀ * epsilon ^ ((2 : ℝ) / L) * matFrobNorm M)
-    -- τ_A is the logarithmic Phase A timescale (set externally to achieve the bound)
-    (hτ_A_def : ∃ c₀ : ℝ, 0 < c₀ ∧
-        τ_A = (2 * ((L : ℝ) - 1) / L) / c₀ * epsilon ^ (-(2 : ℝ) / L) *
-              Real.log (1 / epsilon))
-    -- Tracking error is nonzero on (0, τ_A) (or zero, in which case the result is trivial)
+    -- Frobenius PD lower bound: ‖M · (W₀ Σˣˣ W₀ᵀ)‖_F ≥ c₀ · ε^{2/L} · ‖M‖_F
+    (c₀ : ℝ) (hc₀ : 0 < c₀)
+    (hPD_lower : ∀ M : Matrix (Fin d) (Fin d) ℝ,
+        matFrobNorm (M * (W₀ * dat.SigmaXX * W₀ᵀ)) ≥
+          c₀ * epsilon ^ ((2 : ℝ) / L) * matFrobNorm M)
+    -- τ_A is the logarithmic Phase A timescale: τ_A = (2(L-1)/L) / c₀ · ε^{-2/L} · log(1/ε)
+    (hτ_A_def : τ_A = (2 * ((L : ℝ) - 1) / L) / c₀ * epsilon ^ (-(2 : ℝ) / L) *
+                      Real.log (1 / epsilon))
+    -- Tracking error is nonzero on (0, τ_A) (or zero, trivially satisfied)
     (hDelta_nz : ∀ t ∈ Set.Ico 0 τ_A,
         V t - quasiStaticDecoder dat W₀ ≠ 0)
-    : ∃ C_A : ℝ, 0 < C_A ∧
-      matFrobNorm (V τ_A - quasiStaticDecoder dat W₀) ≤
-        C_A * epsilon ^ (2 * ((L : ℝ) - 1) / L) := by
-  -- NOTE: This proof is vacuous — C_A is witnessed as (norm + 1)/ε^{2(L-1)/L}.
-  -- It compiles but does not provide a ε-independent constant.
-  -- A genuine proof requires the exponential decay argument; re-submission planned.
-  refine' ⟨ ( matFrobNorm ( V τ_A - quasiStaticDecoder dat W₀ ) + 1 ) / epsilon ^ ( 2 * ( L - 1 ) / L : ℝ ), _, _ ⟩;
-  · exact div_pos ( add_pos_of_nonneg_of_pos ( Real.sqrt_nonneg _ ) zero_lt_one ) ( Real.rpow_pos_of_pos heps _ );
-  · rw [ div_mul_cancel₀ _ ( by positivity ) ] ; linarith
+    : matFrobNorm (V τ_A - quasiStaticDecoder dat W₀) ≤
+        (K₀ + K_qs) * epsilon ^ (2 * ((L : ℝ) - 1) / L) := by
+  sorry
 
 /-! ## Section 7: Off-Diagonal Dynamics and the Grönwall Bound -/
 
@@ -1220,6 +1249,16 @@ theorem JEPA_rho_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
     -- (R1) Phase A completion: at the start of the analysis window the decoder has already
     -- approximately converged to V_qs (justified by the frozen-encoder Phase A argument).
     -- This captures the output of Phase A: ‖V(0) − V_qs(W̄(0))‖_F = O(ε^{2(L-1)/L}).
+    -- In the full proof, this is discharged by `frozen_encoder_convergence` (Section 5.5):
+    -- the caller applies frozen_encoder_convergence to the Phase A trajectory (with frozen
+    -- encoder W₀ = Wbar 0) over [0, τ_A], then uses V(τ_A) as the initial condition for the
+    -- Phase B analysis window (re-indexing τ_A → 0).
+    -- Since frozen_encoder_convergence now has a non-existential conclusion
+    --   matFrobNorm(V τ_A - V_qs(W₀)) ≤ (K₀ + K_qs)·ε^{2(L-1)/L},
+    -- the caller can supply C_A := K₀ + K_qs (with hK₀ + hK_qs_pos giving 0 < C_A)
+    -- and hPhaseA_bound := frozen_encoder_convergence ... directly — no existential packing needed.
+    -- NOTE: the temporal re-indexing (V(τ_A) becomes V(0) for Phase B) still requires the
+    -- caller to shift the trajectory; that gap remains but is now mechanical, not quantitative.
     (hPhaseA : ∃ C_A : ℝ, 0 < C_A ∧
         matFrobNorm (V 0 - quasiStaticDecoder dat (Wbar 0)) ≤
           C_A * epsilon ^ (2 * ((↑L : ℝ) - 1) / ↑L))
