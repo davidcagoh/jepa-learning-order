@@ -24,17 +24,23 @@ The central result concerns the feature learning order of a depth-L linear JEPA 
 | `JepaLearningOrder/Lemmas.lean` | Supporting lemmas (Grönwall, PD bounds, contractive bound) |
 | `JepaLearningOrder/OffDiagHelpers.lean` | Bridging helper lemmas |
 | `JepaLearningOrder/GronwallIntegral.lean` | Grönwall integral machinery |
+| `JepaLearningOrder/BootstrapLemmas.lean` | Bootstrap sub-lemmas (session 24, 2026-04-29) |
 | `my_theorems/JEPA_paper_draft.md` | Current paper draft — keep in sync with Lean state |
 
-## Current proof state (as of 2026-04-03)
+## Current proof state (as of 2026-04-29)
 
-**1 sorry remains** in `JEPA.lean`:
+**4 sorries remain** — 1 in `JEPA.lean` (unchanged), 3 new in `BootstrapLemmas.lean` (Aristotle Job A pending):
 
-| Sorry | Line | What it is | Path to close |
-|---|---|---|---|
-| `bootstrap_consistency` | ~496 | Joint ODE continuation (regularity hypothesis) | Long-term: requires Picard-Lindelöf for JEPA gradient-flow system. Kept as explicit named assumption in the main theorem. See §5.3 of paper. |
+| File | Sorry | Line | What it is | Path to close |
+|---|---|---|---|---|
+| `JEPA.lean` | `bootstrap_consistency` | ~496 | Original sorry — joint ODE bounds | Being decomposed; see BootstrapLemmas.lean |
+| `BootstrapLemmas.lean` | `offDiag_ftc` | ~103 | Off-diagonal bound via FTC + Cauchy-Schwarz | **Aristotle Job A (pending)** |
+| `BootstrapLemmas.lean` | `pd_lower_from_offDiag` | ~159 | Spectral PD bound from eigenbasis structure | Aristotle Job B (after Job A returns) |
+| `BootstrapLemmas.lean` | `tracking_bound_from_gronwall` | ~285 | h_D_over_lam rpow arithmetic + assembly | **Aristotle Job A (pending)** |
 
-All other lemmas are **exact** — including `quasiStatic_approx` (Aristotle `1ccc1ab8`) and `contraction_ode_structure` (Aristotle `020b76be`, 8 helper lemmas, wired into `JEPA_rho_ordering`). Build: 8028 jobs, no errors.
+All other lemmas are **exact** — including `quasiStatic_approx` (Aristotle `1ccc1ab8`) and `contraction_ode_structure` (Aristotle `020b76be`). Build: 8029 jobs, no errors.
+
+**New file:** `JepaLearningOrder/BootstrapLemmas.lean` — three sub-lemmas decomposing `bootstrap_consistency`. See § "Bootstrap decomposition" below.
 
 ## Roadmap to full publication readiness
 
@@ -61,12 +67,36 @@ where `K₀` comes from `hV_init` and `K_qs` is a bound on `‖V_qs(W₀)‖_F` 
 
 On success: in `JEPA_rho_ordering`, replace `hPhaseA` with the inputs to `frozen_encoder_convergence` and derive `hPhaseA` internally (same pattern as Step 1 with `hContraction`).
 
-**Step 3 — Handle `bootstrap_consistency` as named regularity assumption (paper)**
+**Step 3 — Bootstrap decomposition (session 24, 2026-04-29)**
 
-Do not attempt to close `bootstrap_consistency` via Aristotle — it requires ODE continuation machinery not in Mathlib. Instead:
-- It is already explicitly sorry'd and named. This is the CompCert convention; every ODE-based learning dynamics paper assumes solution existence.
-- The paper §5.3 already has the full proof sketch.
-- For submission: ensure the paper abstract and §1 name bootstrap as the single explicit open item.
+The previous note "Do not attempt via Aristotle — requires Picard-Lindelöf" was **wrong on two counts**:
+1. Mathlib does have `Mathlib.Analysis.ODE.PicardLindelof` (Kudryashov/Winston Yin).
+2. `bootstrap_consistency` takes the ODE solution as a given hypothesis (`hV_flow_ode`). It does not prove existence — it proves bounds.
+
+**Key insight:** `gradV` is **linear in V**: `gradV dat Wbar V = V*(Wbar*SigmaXX*Wbar^T) - Wbar*SigmaYX*Wbar^T`. Therefore the two conclusions decouple:
+
+- **Off-diagonal bound** (conclusion 1): provable directly by FTC on `t ↦ offDiagAmplitude dat eb (Wbar t) r s`, since this is linear in Wbar. Derivative bounded by `C * K * ε²` via Cauchy-Schwarz + `hWbar_slow`. No bootstrap needed.
+- **Tracking bound** (conclusion 2): follows from `contraction_ode_structure` + `contractive_gronwall_decay` (both proved), given the Frobenius PD lower bound on `Wbar*SigmaXX*Wbar^T`.
+
+**New file: `BootstrapLemmas.lean`** contains three sub-lemmas:
+
+```
+offDiag_ftc              — FTC + Cauchy-Schwarz (Aristotle Job A)
+pd_lower_from_offDiag   — spectral perturbation in eigenbasis (Aristotle Job B)
+tracking_bound_from_gronwall — assembles 020b76be + 1afe6f24 (Aristotle Job A)
+```
+
+**Submission:** `help_from_aristotle/21_bootstrap_request.md` — prompts for both jobs.
+
+**New hypothesis added to `bootstrap_consistency`:** `hWbar_init` (Frobenius norm bound on Wbar(0)). This is already a hypothesis of `JEPA_rho_ordering` (line 1387), so adding it does not increase the overall assumption count.
+
+**What closes with Job A:**
+- `offDiag_ftc` sorry fills → `hoff_small` can be derived (not assumed) in `JEPA_rho_ordering`
+- `tracking_bound_from_gronwall` sorry fills → tracking bound assembled from existing lemmas
+
+**What remains after Job A:**
+- `pd_lower_from_offDiag` (Job B, separate) — spectral perturbation: diagonal amps ≥ c*ε^{1/L} + off-diagonal small → `Wbar*SigmaXX*Wbar^T` has min eigenvalue ≥ c₀*ε^{2/L}
+- `hPhaseA` and `hPD_lower` remain as explicit hypotheses of `JEPA_rho_ordering` until Job B lands
 
 **Step 4 — Update paper draft (immediate priority)**
 
@@ -86,10 +116,11 @@ The abstract and §1 contribution list still describe `contraction_ode_structure
 **Do submit soon.** The "first machine-checked learning-dynamics result" claim has time value. One named sorry (`bootstrap_consistency`) is a strong position — this is the standard global-existence hypothesis that all informal ODE learning-theory papers leave implicit.
 
 **Priority ranking for remaining work:**
-1. Update paper abstract and §1 (fast, high impact — changes the story from "two gaps" to "one gap")
-2. Reformulate and resubmit `frozen_encoder_convergence` (discharges `hPhaseA`, reduces named hypotheses from 3 to 2)
-3. Submit the paper to a theory-ML venue (NeurIPS/ICLR/TMLR or COLT)
-4. Do NOT chase `bootstrap_consistency` in Lean — it requires Picard-Lindelöf infrastructure Mathlib doesn't have yet
+1. Submit Aristotle Job A (`offDiag_ftc` + `tracking_bound_from_gronwall`) — see `help_from_aristotle/21_bootstrap_request.md`
+2. Submit Aristotle Job B (`pd_lower_from_offDiag`) after Job A returns
+3. ArXiv upload (paper.tex is ready; 1 named sorry remains in JEPA.lean pending Jobs A+B)
+4. Reformulate `frozen_encoder_convergence` genuinely (discharges `hPhaseA`)
+5. Submit to theory-ML venue (NeurIPS/ICLR/TMLR or COLT) after arXiv
 
 **What reviewers will care about:**
 - The mathematical contribution (removing simultaneous diagonalisability) is real and clean
