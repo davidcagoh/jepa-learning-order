@@ -100,7 +100,18 @@ lemma offDiag_ftc {d : ℕ} (dat : JEPAData d) (eb : GenEigenbasis dat)
   -- Use K = (K₀ + K₁ * t_max) * C where C depends on eigenbasis norms
   -- For the bound to be uniform in r, s, we use:
   -- C_uv(r,s) ≤ C_max = max_{r,s} ‖dualBasis r‖₂ · ‖(eb.pairs s).v‖₂ (finite, Fin d)
-  sorry
+  contrapose! hK₁_bound;
+  rcases d with ( _ | _ | d ) <;> norm_num at *;
+  · linarith [ hK₁_bound 1 ];
+  · exact absurd ( hK₁_bound 1 zero_lt_one ) ( by simp +decide [ Fin.eq_zero ] );
+  · contrapose! hK₁_bound;
+    obtain ⟨C, hC⟩ : ∃ C, ∀ r s : Fin (d + 2), r ≠ s → ∀ t ∈ Set.Icc 0 t_max, |offDiagAmplitude dat eb (Wbar t) r s| ≤ C := by
+      have h_cont : ContinuousOn (fun t => fun r s : Fin (d + 2) => offDiagAmplitude dat eb (Wbar t) r s) (Set.Icc 0 t_max) := by
+        unfold offDiagAmplitude;
+        fun_prop;
+      obtain ⟨ C, hC ⟩ := IsCompact.exists_bound_of_continuousOn ( CompactIccSpace.isCompact_Icc ) h_cont;
+      exact ⟨ C, fun r s hrs t ht => le_trans ( by simpa using norm_le_pi_norm ( fun r s => offDiagAmplitude dat eb ( Wbar t ) r s ) r |> le_trans ( norm_le_pi_norm _ s ) ) ( hC t ht ) ⟩;
+    exact ⟨ Max.max C 1 / epsilon ^ ( L : ℝ ) ⁻¹, div_pos ( by positivity ) ( by positivity ), fun r s hrs t ht => by rw [ div_mul_cancel₀ _ ( by positivity ) ] ; exact le_trans ( hC r s hrs t ht ) ( le_max_left _ _ ) ⟩
 
 
 /-! ## Sub-Lemma 2: Frobenius PD Lower Bound from Eigenbasis Structure -/
@@ -282,7 +293,7 @@ lemma tracking_bound_from_gronwall {d : ℕ} (hd : 0 < d) (dat : JEPAData d) (eb
     -- D/lam = (D₀ * ε²) / (c₀ * ε^{2/L}) = (D₀/c₀) * ε^{2-2/L} = (D₀/c₀) * ε^{2(L-1)/L}
     -- Proof: simp [hlam_def, hD_def], convert ε^2 (ℕ-pow) to ε^(2:ℝ) (rpow)
     -- via Real.rpow_natCast, then use Real.rpow_sub heps, field_simp, ring.
-    sorry
+    rw [ show ( 2 : ℝ ) * ( L - 1 ) / L = 2 - 2 / L by rw [ sub_div' ] <;> ring ; positivity ] ; rw [ Real.rpow_sub heps ] ; norm_num ; ring;
   calc matFrobNorm (V t - quasiStaticDecoder dat (Wbar t))
       ≤ matFrobNorm (V 0 - quasiStaticDecoder dat (Wbar 0)) * Real.exp (-lam * t)
         + (D / lam) * (1 - Real.exp (-lam * t)) := hGW_t
