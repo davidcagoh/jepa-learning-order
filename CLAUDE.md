@@ -34,11 +34,12 @@ lake build JepaLearningOrder.Lemmas
 ## Scripts
 
 ```bash
-python ../scripts/status.py
-python ../scripts/retrieve.py
-python ../scripts/submit.py my_theorems/JEPA_paper_draft.md "..." --dry-run
-python ../scripts/submit.py my_theorems/JEPA_paper_draft.md "..."
-python ../scripts/watch.py
+python ../stochastic-proofs-handbook/scripts/status.py
+python ../stochastic-proofs-handbook/scripts/retrieve.py
+python ../stochastic-proofs-handbook/scripts/retrieve.py <project-id>
+python ../stochastic-proofs-handbook/scripts/submit.py my_theorems/JEPA_paper_draft.md "..." --dry-run
+python ../stochastic-proofs-handbook/scripts/submit.py my_theorems/JEPA_paper_draft.md "..."
+python ../stochastic-proofs-handbook/scripts/watch.py
 ```
 
 ## Architecture invariants (do not violate)
@@ -67,7 +68,7 @@ python ../scripts/watch.py
 2. Off-diagonal bound follows by FTC alone (not bootstrap): `offDiagAmplitude` is linear in Wbar, so its derivative is bounded by Cauchy-Schwarz + `hWbar_slow`.
 3. Tracking bound assembles already-proved `contraction_ode_structure` (020b76be) + `contractive_gronwall_decay` (1afe6f24).
 
-See `wiki/decisions.md` and `help_from_aristotle/21_bootstrap_request.md` for full proof strategy.
+See `wiki/decisions.md` and `requests/21_bootstrap_request.md` for full proof strategy.
 
 ## Key proved lemmas
 
