@@ -2,7 +2,7 @@
 .env
 aristotle-docs.md
 memory/
-proofs-from-literature/
+literature/
 .DS_Store
 **/.DS_Store
 .claude/settings.local.json
