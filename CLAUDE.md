@@ -21,7 +21,8 @@ Part of the **Stochastic Proofs** workspace. Shared conventions and Aristotle wo
 | `JepaLearningOrder/OffDiagHelpers.lean` | Bridging helper lemmas |
 | `JepaLearningOrder/GronwallIntegral.lean` | Grönwall integral machinery |
 | `JepaLearningOrder/PDLowerHelpers.lean` | Six helper lemmas for pd_lower_from_offDiag (Gershgorin, Frobenius norm, det factorization) |
-| `JepaLearningOrder/BootstrapLemmas.lean` | Three sub-lemmas + proved `bootstrap_consistency` (sessions 24–28) |
+| `JepaLearningOrder/BootstrapLemmas.lean` | Three sub-lemmas + `bootstrap_consistency` + `uniform_pd_lower_from_compactness` (sessions 24–30) |
+| `JepaLearningOrder/MainTheorem.lean` | `JEPA_rho_ordering'` — main theorem with `hPD_lower` derived via compactness (session 30) |
 | `my_theorems/paper.tex` | LaTeX paper — **authoritative spec** for what the theorem should say |
 
 ## Build commands
