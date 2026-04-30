@@ -356,6 +356,127 @@ lemma tracking_bound_from_gronwall {d : ℕ} (hd : 0 < d) (dat : JEPAData d) (eb
           rw [h_D_over_lam]; linarith
     _ = (C_A + D₀ / c₀) * epsilon ^ (2 * ((L : ℝ) - 1) / L) := by ring
 
+/-! ## Uniform PD Lower Bound via Compactness -/
+
+/-
+ContinuousOn for matrix determinant.
+-/
+lemma continuousOn_matrix_det {X : Type*} [TopologicalSpace X] {s : Set X}
+    {d : ℕ} {A : X → Matrix (Fin d) (Fin d) ℝ}
+    (hA : ContinuousOn A s) :
+    ContinuousOn (fun x => (A x).det) s := by
+      fun_prop
+
+/-
+ContinuousOn for matrix adjugate.
+-/
+lemma continuousOn_matrix_adjugate {X : Type*} [TopologicalSpace X] {s : Set X}
+    {d : ℕ} {A : X → Matrix (Fin d) (Fin d) ℝ}
+    (hA : ContinuousOn A s) :
+    ContinuousOn (fun x => (A x).adjugate) s := by
+      -- Use the fact that the adjugate entries are continuous combo of submatrix determinants
+      fun_prop (disch := simp)
+
+/-- ContinuousOn for matrix inverse when det ≠ 0 on the domain. -/
+lemma continuousOn_matrix_inv {X : Type*} [TopologicalSpace X] {s : Set X}
+    {d : ℕ} {A : X → Matrix (Fin d) (Fin d) ℝ}
+    (hA : ContinuousOn A s)
+    (hdet : ∀ x ∈ s, (A x).det ≠ 0) :
+    ContinuousOn (fun x => (A x)⁻¹) s := by
+  simp_rw [Matrix.inv_def, Ring.inverse_eq_inv]
+  exact (continuousOn_matrix_det hA |>.inv₀ hdet |>.smul
+         (continuousOn_matrix_adjugate hA))
+
+/-- ContinuousOn for matFrobNorm composed with a continuous matrix-valued function. -/
+lemma continuousOn_matFrobNorm_comp {X : Type*} [TopologicalSpace X] {s : Set X}
+    {n m : ℕ} {A : X → Matrix (Fin n) (Fin m) ℝ}
+    (hA : ContinuousOn A s) :
+    ContinuousOn (fun x => matFrobNorm (A x)) s := by
+  unfold matFrobNorm
+  apply ContinuousOn.sqrt
+  exact continuousOn_finset_sum _ fun i _ =>
+    continuousOn_finset_sum _ fun j _ =>
+      (continuousOn_pi.mp (continuousOn_pi.mp hA i) j).pow _
+
+/-- Uniform PD lower bound from compactness: if Wbar_t is continuous on [0, t_max]
+    and pd_lower_from_offDiag holds at each t, then a uniform c₀ exists.
+
+    Proof: At each t, A(t)⁻¹ exists (by Gershgorin + diagonal dominance) and
+    matFrobNorm(A(t)⁻¹) is continuous (since A(t) is continuous and det(A(t)) ≠ 0).
+    On the compact [0, t_max], matFrobNorm(A(t)⁻¹) achieves its maximum K.
+    Then c₀ = 1/(K * ε^{2/L}) works uniformly. -/
+lemma uniform_pd_lower_from_compactness {d : ℕ} (hd : 0 < d) (dat : JEPAData d)
+    (eb : GenEigenbasis dat)
+    (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (L : ℕ) (hL : 2 ≤ L) (t_max : ℝ) (ht_max : 0 < t_max)
+    (c_w : ℝ) (hc_w : 0 < c_w)
+    (δ : ℝ) (hδ_nn : 0 ≤ δ) (hδ_small : δ * ((d : ℝ) - 1) < c_w)
+    (Wbar_t : ℝ → Matrix (Fin d) (Fin d) ℝ)
+    (hWbar_cont : ContinuousOn Wbar_t (Set.Icc 0 t_max))
+    -- At each t, the diagonal/off-diagonal amplitude conditions hold
+    (hdiag_t : ∀ t ∈ Set.Icc 0 t_max, ∀ r : Fin d,
+        diagAmplitude dat eb (Wbar_t t) r ≥ c_w * epsilon ^ ((1:ℝ)/L))
+    (hoff_t : ∀ t ∈ Set.Icc 0 t_max, ∀ r s : Fin d, r ≠ s →
+        |offDiagAmplitude dat eb (Wbar_t t) r s| ≤ δ * epsilon ^ ((1:ℝ)/L)) :
+    ∃ c₀ : ℝ, 0 < c₀ ∧ ∀ t ∈ Set.Icc 0 t_max, ∀ M : Matrix (Fin d) (Fin d) ℝ,
+        matFrobNorm (M * (Wbar_t t * dat.SigmaXX * (Wbar_t t)ᵀ)) ≥
+            c₀ * epsilon ^ ((2:ℝ)/L) * matFrobNorm M := by
+  -- Step 1: Define A(t) = Wbar_t(t) * SigmaXX * Wbar_t(t)ᵀ
+  set A := fun t => Wbar_t t * dat.SigmaXX * (Wbar_t t)ᵀ with hA_def
+  -- Step 2: Show A(t).det ≠ 0 for all t ∈ [0, t_max]
+  have hA_det : ∀ t ∈ Set.Icc 0 t_max, (A t).det ≠ 0 := by
+    intro t ht
+    have hdet_wbar : (Wbar_t t).det ≠ 0 :=
+      wbar_det_ne_zero hd dat eb (Wbar_t t) epsilon heps L hL c_w hc_w
+        (hdiag_t t ht) δ hδ_nn (hoff_t t ht) hδ_small
+    simp [hA_def, Matrix.det_mul, Matrix.det_transpose]
+    exact ⟨⟨hdet_wbar, ne_of_gt dat.hSigmaXX_pos.det_pos⟩, hdet_wbar⟩
+  -- Step 3: A(t) is continuous on [0, t_max]
+  have hA_cont : ContinuousOn A (Set.Icc 0 t_max) := by
+    apply ContinuousOn.mul
+    exact ContinuousOn.mul hWbar_cont continuousOn_const
+    exact continuousOn_pi.mpr fun i => continuousOn_pi.mpr fun j =>
+      continuousOn_pi.mp (continuousOn_pi.mp hWbar_cont j) i
+  -- Step 4: A(t)⁻¹ is continuous on [0, t_max]
+  have hA_inv_cont : ContinuousOn (fun t => (A t)⁻¹) (Set.Icc 0 t_max) :=
+    continuousOn_matrix_inv hA_cont hA_det
+  -- Step 5: matFrobNorm(A(t)⁻¹) is continuous on [0, t_max]
+  have hfn_cont : ContinuousOn (fun t => matFrobNorm (A t)⁻¹) (Set.Icc 0 t_max) :=
+    continuousOn_matFrobNorm_comp hA_inv_cont
+  -- Step 6: By compactness, matFrobNorm(A(t)⁻¹) achieves its max K on [0, t_max]
+  obtain ⟨t₀, ht₀_mem, ht₀_max⟩ := IsCompact.exists_isMaxOn
+    isCompact_Icc ⟨0, Set.left_mem_Icc.mpr ht_max.le⟩ hfn_cont
+  set K := matFrobNorm (A t₀)⁻¹ with hK_def
+  -- Step 7: K > 0
+  have hK_pos : 0 < K := by
+    apply matFrobNorm_pos_of_ne_zero
+    intro h
+    have h1 := Matrix.mul_nonsing_inv (A t₀) (IsUnit.mk0 _ (hA_det t₀ ht₀_mem))
+    rw [h, mul_zero] at h1
+    exact hd.ne' (by simpa using congr_fun (congr_fun h1 ⟨0, hd⟩) ⟨0, hd⟩)
+  -- Step 8: For all t, matFrobNorm(A(t)⁻¹) ≤ K
+  have hK_bound : ∀ t ∈ Set.Icc 0 t_max, matFrobNorm (A t)⁻¹ ≤ K := fun t ht => ht₀_max ht
+  -- Step 9: Choose c₀ = 1 / (K * ε^{2/L})
+  have heps_rpow_pos : 0 < epsilon ^ ((2 : ℝ) / L) := Real.rpow_pos_of_pos heps _
+  refine ⟨1 / (K * epsilon ^ ((2:ℝ)/L)), by positivity, fun t ht M => ?_⟩
+  -- Step 10: Prove the bound
+  -- From M = (M * A(t)) * A(t)⁻¹ and submultiplicativity:
+  -- matFrobNorm(M) ≤ matFrobNorm(M * A(t)) * matFrobNorm(A(t)⁻¹)
+  -- ≤ matFrobNorm(M * A(t)) * K
+  -- So matFrobNorm(M * A(t)) ≥ matFrobNorm(M) / K = c₀ * ε^{2/L} * matFrobNorm(M)
+  have hA_unit : IsUnit (A t).det := IsUnit.mk0 _ (hA_det t ht)
+  have hM_eq : M = M * A t * (A t)⁻¹ := by
+    rw [Matrix.mul_assoc, Matrix.mul_nonsing_inv _ hA_unit, mul_one]
+  have h_K_inv_bound : matFrobNorm (A t)⁻¹ ≤ K := hK_bound t ht
+  have h_c_eq : 1 / (K * epsilon ^ ((2:ℝ)/L)) * epsilon ^ ((2:ℝ)/L)
+      = 1 / K := by field_simp
+  rw [ge_iff_le, h_c_eq, show (1 : ℝ) / K * matFrobNorm M = matFrobNorm M / K from by ring]
+  rw [div_le_iff₀ hK_pos]
+  calc matFrobNorm M
+      = matFrobNorm (M * A t * (A t)⁻¹) := by rw [← hM_eq]
+    _ ≤ matFrobNorm (M * A t) * matFrobNorm (A t)⁻¹ := matFrobNorm_mul_le _ _
+    _ ≤ matFrobNorm (M * A t) * K := by
+          exact mul_le_mul_of_nonneg_left h_K_inv_bound (matFrobNorm_nonneg _)
 
 /-! ## Proposition 6.5: Bootstrap Consistency (Assembled) -/
 
@@ -364,14 +485,11 @@ lemma tracking_bound_from_gronwall {d : ℕ} (hd : 0 < d) (dat : JEPAData d) (eb
 
     - **B.1 (`offDiag_ftc`)**: The off-diagonal amplitude bound follows from FTC + slow encoder
       dynamics — no bootstrap or ODE continuation needed.
+    - **B.2 (`pd_lower_from_offDiag` + `uniform_pd_lower_from_compactness`)**: The uniform
+      Frobenius PD lower bound on `Wbar(t) * SigmaXX * Wbar(t)ᵀ` is derived from diagonal
+      dominance (Gershgorin) via compactness, rather than assumed.
     - **B.3 (`tracking_bound_from_gronwall`)**: The tracking bound follows from the PD lower
       bound via contractive Gronwall.
-
-    **Remaining gap** (`hPD_lower`): Lemma B.2 (`pd_lower_from_offDiag`, Aristotle `53f7f1b1`)
-    derives a pointwise-in-t PD lower bound from the off-diagonal bound + Gershgorin. Getting
-    a *uniform* c₀ over [0, t_max] requires a compactness argument (continuity of t ↦ ‖A(t)⁻¹‖_F
-    on the compact interval + IsCompact.exists_bound). Until that is proved, `hPD_lower` is taken
-    as an explicit hypothesis.
 
     **Import note**: BootstrapLemmas.lean imports JEPA.lean, so `bootstrap_consistency` cannot
     currently be called from `JEPA_rho_ordering` (which lives in JEPA.lean). Moving
@@ -393,11 +511,15 @@ lemma bootstrap_consistency {d : ℕ} (hd : 0 < d) (dat : JEPAData d) (eb : GenE
     -- (H5) Decoder gradient-flow ODE
     (hV_flow_ode : ∀ t ∈ Set.Icc 0 t_max,
         HasDerivAt V (-(gradV dat (Wbar t) (V t))) t)
-    -- (H6) Frobenius PD lower bound — to be derived from pd_lower_from_offDiag + compactness
-    (hPD_lower : ∃ c₀ : ℝ, 0 < c₀ ∧ ∀ t ∈ Set.Icc 0 t_max,
-        ∀ M : Matrix (Fin d) (Fin d) ℝ,
-          matFrobNorm (M * (Wbar t * dat.SigmaXX * (Wbar t)ᵀ)) ≥
-            c₀ * epsilon ^ ((2 : ℝ) / L) * matFrobNorm M)
+    -- (H6) Diagonal amplitude lower bound + Gershgorin constants
+    --      (replaces the former hPD_lower hypothesis, which is now derived
+    --       via uniform_pd_lower_from_compactness)
+    (c_w : ℝ) (hc_w : 0 < c_w)
+    (hdiag_t : ∀ t ∈ Set.Icc 0 t_max, ∀ r : Fin d,
+        diagAmplitude dat eb (Wbar t) r ≥ c_w * epsilon ^ ((1 : ℝ) / L))
+    (δ_off : ℝ) (hδ_nn : 0 ≤ δ_off) (hδ_small : δ_off * ((d : ℝ) - 1) < c_w)
+    (hoff_t : ∀ t ∈ Set.Icc 0 t_max, ∀ r s : Fin d, r ≠ s →
+        |offDiagAmplitude dat eb (Wbar t) r s| ≤ δ_off * epsilon ^ ((1 : ℝ) / L))
     -- (H7) Phase A: initial tracking error is O(ε^{2(L-1)/L})
     (hPhaseA : ∃ C_A : ℝ, 0 < C_A ∧
         matFrobNorm (V 0 - quasiStaticDecoder dat (Wbar 0)) ≤
@@ -418,8 +540,13 @@ lemma bootstrap_consistency {d : ℕ} (hd : 0 < d) (dat : JEPAData d) (eb : GenE
     -- (ii) Tracking error bound (Lemma B.3)
     (∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Icc 0 t_max,
         matFrobNorm (V t - quasiStaticDecoder dat (Wbar t)) ≤
-          C * epsilon ^ (2 * ((L : ℝ) - 1) / L)) :=
-  ⟨offDiag_ftc dat eb Wbar epsilon heps heps_small L hL t_max ht_max
+          C * epsilon ^ (2 * ((L : ℝ) - 1) / L)) := by
+  -- Derive the uniform PD lower bound from diagonal/off-diagonal conditions + compactness
+  have hPD_lower := uniform_pd_lower_from_compactness hd dat eb epsilon heps heps_small L hL
+    t_max ht_max c_w hc_w δ_off hδ_nn hδ_small Wbar hWbar_cont hdiag_t hoff_t
+  exact ⟨offDiag_ftc dat eb Wbar epsilon heps heps_small L hL t_max ht_max
       hWbar_init hWbar_slow hWbar_diff hWbar_cont,
    tracking_bound_from_gronwall hd dat eb L hL epsilon heps heps_small t_max ht_max V Wbar
       hV_flow_ode hPhaseA hPD_lower hVqs_deriv_exists hDrift_bound hDelta_nz hVqs_cont⟩
+
+
