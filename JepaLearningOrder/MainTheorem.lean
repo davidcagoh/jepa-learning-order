@@ -138,3 +138,71 @@ theorem JEPA_rho_ordering' (dat : JEPAData d) (eb : GenEigenbasis dat)
   exact JEPA_rho_ordering dat eb L hL epsilon heps heps_small t_max ht_max V Wbar
     h_init hWbar_slow hWbar_init hV_flow_ode hV_init hoff_small hWbar_cont hV_cont hVqs_cont
     hPhaseA hVqs_deriv_exists hDrift_bound hPD_lower hDelta_nz
+
+/-! ## Section 7: Dynamics-level ρ*-ordering (strongest result)
+
+    The previous `JEPA_rho_ordering'` gives the *formula-level* ordering of
+    critical times. This section assembles Jobs E (`diagAmp_ODE`),
+    F (`jepa_critical_time_diag`), and G (`actual_critical_time`) into the
+    dynamics-level ordering theorem: under the same hypotheses as
+    `JEPA_rho_ordering'`, if `ρ_r* > ρ_s*` and `λ_r* ≥ λ_s*`, then for all
+    sufficiently small ε the *actual* JEPA hitting times satisfy
+    `T̂_r < T̂_s`.
+
+    See `my_theorems/strongest_result_roadmap.md` for the proof plan and
+    `my_theorems/paper.tex` Section 6 (Theorem~\ref{thm:dynamics-ordering})
+    for the math statement.
+
+    Status: stub with `sorry` — to be discharged after Jobs E, F, G land.
+-/
+
+/-- **Theorem (Dynamics-level ρ*-ordering of feature learning).**
+    Under (A1)-(A5), (H1)-(H4), and bootstrap, if `ρ_r* > ρ_s*` and
+    `λ_r* ≥ λ_s*`, then the actual JEPA training dynamics satisfy
+    `T̂_r < T̂_s` for all ε sufficiently small.
+
+    This subsumes `critical_time_ordering` (which gave only the formula-level
+    n=1 Laurent term ordering). -/
+theorem JEPA_dynamics_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
+    (L : ℕ) (hL : 2 ≤ L)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (V Wbar : ℝ → ℝ → Matrix (Fin d) (Fin d) ℝ)
+      -- Wbar and V parameterised by (epsilon, t)
+    (hWbar_slow : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∃ K : ℝ, 0 < K ∧ ∀ t ∈ Set.Icc 0 t_max,
+        matFrobNorm (deriv (Wbar epsilon) t) ≤ K * epsilon ^ 2)
+    (hV_flow_ode : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∀ t ∈ Set.Icc 0 t_max,
+        HasDerivAt (V epsilon) (-(gradV dat (Wbar epsilon t) (V epsilon t))) t)
+    (htrack : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∃ K : ℝ, 0 < K ∧ ∀ t ∈ Set.Icc 0 t_max,
+        matFrobNorm (V epsilon t - quasiStaticDecoder dat (Wbar epsilon t)) ≤
+          K * epsilon ^ (2 * ((L : ℝ) - 1) / L))
+    (hoff : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∃ K : ℝ, 0 < K ∧ ∀ r s : Fin d, r ≠ s → ∀ t ∈ Set.Icc 0 t_max,
+        |offDiagAmplitude dat eb (Wbar epsilon t) r s|
+          ≤ K * epsilon ^ ((1 : ℝ) / L))
+    (r s : Fin d)
+    (hrho : (eb.pairs s).rho < (eb.pairs r).rho)
+    (hlam : projectedCovariance dat eb s ≤ projectedCovariance dat eb r)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1) :
+    ∃ epsilon_0 : ℝ, 0 < epsilon_0 ∧ epsilon_0 < 1 ∧
+      ∀ epsilon : ℝ, 0 < epsilon → epsilon < epsilon_0 →
+        hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) r)
+                     (p * (eb.pairs r).rho ^ L) t_max
+        < hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) s)
+                     (p * (eb.pairs s).rho ^ L) t_max := by
+  -- Proof skeleton (see roadmap):
+  -- 1. Apply diagAmp_ODE for both r and s to get Bernoulli ODEs with
+  --    error ε^{(2L-1)/L}.
+  -- 2. Apply jepa_critical_time_diag to extract t*_r and t*_s as the
+  --    Laurent expansions in ε^{1/L}.
+  -- 3. Apply actual_critical_time twice to bound |T̂ - t*| = O(ε^{-(L-2)/L})
+  --    for both r and s.
+  -- 4. Compute t*_s - t*_r: leading λ-only terms cancel when λ_r = λ_s
+  --    (for the equal-λ case), or differ by a positive amount when λ_r > λ_s.
+  --    The first ρ-distinguishing term is the n=1 summand
+  --    L (ρ_r^{-(2L-2)} - ρ_s^{-(2L-2)})/(λ ε^{1/L}) > 0.
+  -- 5. The total separation is Θ(ε^{-1/L}); the perturbation error is
+  --    o(ε^{-1/L}), so for ε small enough, T̂_r < T̂_s.
+  sorry

@@ -454,6 +454,149 @@ lemma critical_time_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
   rw [div_lt_div_iff₀ hDr hDs]
   exact mul_lt_mul_of_pos_left hden hL_pos
 
+/-! ## Section 6.5: Strongest result — dynamics-level ordering (Jobs E, F, G)
+
+    These four lemmas close the conceptual gap left by `critical_time_formula`
+    (which is currently a degenerate existential). Together they prove that
+    the *actual* JEPA training dynamics satisfy the ρ*-ordering, not just the
+    leading-order formula.
+
+    See `my_theorems/strongest_result_roadmap.md` for the full plan and
+    `my_theorems/paper.tex` Section 6 for the math statements.
+
+    Status: stubs with `sorry` — to be discharged by Aristotle Jobs E, F, G.
+-/
+
+/-- **Hitting time of a continuous process at threshold θ.**
+    First time at which `f t ≥ θ`. Defined as the infimum over the set
+    `{t ∈ Set.Icc 0 t_max | f t ≥ θ}`; if the set is empty, defaults to
+    `t_max + 1` (an unattainable sentinel). -/
+noncomputable def hittingTime (f : ℝ → ℝ) (θ : ℝ) (t_max : ℝ) : ℝ :=
+  sInf ({t ∈ Set.Icc (0 : ℝ) t_max | f t ≥ θ} ∪ {t_max + 1})
+
+/-- **Job F (Littwin Lemma B.6 — partial fraction identity).**
+    The integrand `1/(ψ^{2L} − ψ^{2L+1}) = 1/(ψ^{2L}(1−ψ))` admits an
+    elementary antiderivative as a finite sum. This is purely algebraic and
+    is provable by induction on `L`. -/
+lemma bernoulli_partial_fractions (L : ℕ) (hL : 1 ≤ L) (ψ : ℝ)
+    (hψ_pos : 0 < ψ) (hψ_lt : ψ < 1) :
+    HasDerivAt
+      (fun x : ℝ =>
+        -(∑ n ∈ Finset.Ioc 0 (2 * L - 1), 1 / ((n : ℝ) * x ^ n))
+        + Real.log x - Real.log (1 - x))
+      (1 / (ψ ^ (2 * L) - ψ ^ (2 * L + 1))) ψ := by
+  sorry
+
+/-- **Job F (Littwin Theorem 4.4 — JEPA Bernoulli closed form).**
+    The unperturbed JEPA Bernoulli ODE
+    `dwbar/dt = L wbar^{3-1/L} Σ_yx − L wbar^3 Σ_xx`
+    admits the implicit closed-form solution
+    `−Σ_{n=1}^{2L-1} 1/(n ψ^n) + log ψ − log(1−ψ) = (σ²ρ^{2L}/L) t + C`
+    where `ψ = wbar^{1/L}/ρ`, `ρ = Σ_yx/Σ_xx`, `σ² = Σ_xx`. -/
+lemma jepa_bernoulli_solution (L : ℕ) (hL : 2 ≤ L)
+    (ρ σ_xx : ℝ) (hρ : 0 < ρ) (hσ_xx : 0 < σ_xx)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (wbar : ℝ → ℝ) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (hwbar_init : wbar 0 = epsilon)
+    (hwbar_ode : ∀ t ∈ Set.Icc (0 : ℝ) t_max,
+      HasDerivAt wbar
+        ((L : ℝ) * Real.rpow (wbar t) (3 - 1 / L) * (ρ * σ_xx)
+         - (L : ℝ) * (wbar t) ^ 3 * σ_xx) t)
+    (hwbar_pos : ∀ t ∈ Set.Icc (0 : ℝ) t_max, 0 < wbar t)
+    (hwbar_lt : ∀ t ∈ Set.Icc (0 : ℝ) t_max, Real.rpow (wbar t) (1 / L) < ρ) :
+    ∃ C : ℝ,
+    ∀ t ∈ Set.Icc (0 : ℝ) t_max,
+      -(∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+          1 / ((n : ℝ) * (Real.rpow (wbar t) (1 / L) / ρ) ^ n))
+      + Real.log (Real.rpow (wbar t) (1 / L) / ρ)
+      - Real.log (1 - Real.rpow (wbar t) (1 / L) / ρ)
+      = (σ_xx * ρ ^ (2 * L) / L) * t + C := by
+  sorry
+
+/-- **Job F (Littwin Theorem 4.5 — diagonal-case critical time).**
+    Closed-form Laurent expansion of the critical time at which
+    `wbar(t)^{1/L}/ρ` reaches `p^{1/L}`. The leading order in ε is
+    `L/((2L−1) λ ε^{(2L-1)/L})` (the n=2L-1 summand) which depends only on
+    λ, not ρ. The ρ-dependence enters at the n=1 summand
+    `L/(λ ρ^{2L-2} ε^{1/L})`. -/
+lemma jepa_critical_time_diag (L : ℕ) (hL : 2 ≤ L)
+    (ρ σ_xx : ℝ) (hρ : 0 < ρ) (hσ_xx : 0 < σ_xx)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (wbar : ℝ → ℝ) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (hwbar_init : wbar 0 = epsilon)
+    (hwbar_ode : ∀ t ∈ Set.Icc (0 : ℝ) t_max,
+      HasDerivAt wbar
+        ((L : ℝ) * Real.rpow (wbar t) (3 - 1 / L) * (ρ * σ_xx)
+         - (L : ℝ) * (wbar t) ^ 3 * σ_xx) t) :
+    -- Hitting time differs from Littwin's Laurent sum by O(|log ε|).
+    ∃ K : ℝ, 0 < K ∧
+    |hittingTime wbar (p * ρ ^ L) t_max
+       - (1 / (σ_xx * ρ)) *
+         ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+           (L : ℝ)
+           / ((n : ℝ) * ρ ^ (2 * L - n - 1) * epsilon ^ ((n : ℝ) / L))|
+      ≤ K * |Real.log epsilon| := by
+  sorry
+
+/-- **Job E (Diagonal amplitude ODE in the generalised eigenbasis).**
+    Under (H1)-(H4) and bootstrap, the diagonal amplitude `σ_r(t)` satisfies
+    Littwin's Bernoulli ODE up to error of order `ε^{(2L-1)/L}`.
+    The error comes from off-diagonal coupling (controlled by the bootstrap
+    Grönwall bound) and the residual decoder error `V − V_qs`. -/
+lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
+    (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (V Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ)
+    (hWbar_slow : ∃ K : ℝ, 0 < K ∧ ∀ t ∈ Set.Icc 0 t_max,
+        matFrobNorm (deriv Wbar t) ≤ K * epsilon ^ 2)
+    (hV_flow_ode : ∀ t ∈ Set.Icc 0 t_max,
+        HasDerivAt V (-(gradV dat (Wbar t) (V t))) t)
+    (htrack : ∃ K : ℝ, 0 < K ∧ ∀ t ∈ Set.Icc 0 t_max,
+        matFrobNorm (V t - quasiStaticDecoder dat (Wbar t)) ≤
+          K * epsilon ^ (2 * ((L : ℝ) - 1) / L))
+    (hoff : ∃ K : ℝ, 0 < K ∧ ∀ r s : Fin d, r ≠ s → ∀ t ∈ Set.Icc 0 t_max,
+        |offDiagAmplitude dat eb (Wbar t) r s| ≤ K * epsilon ^ ((1 : ℝ) / L))
+    (r : Fin d) :
+    ∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Ioo 0 t_max,
+      |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
+       - ((L : ℝ) * projectedCovariance dat eb r
+            * Real.rpow (diagAmplitude dat eb (Wbar t) r) (3 - 1 / L)
+            * (1 - Real.rpow (diagAmplitude dat eb (Wbar t) r) (1 / L)
+                   / (eb.pairs r).rho))|
+      ≤ C * epsilon ^ ((2 * (L : ℝ) - 1) / L) := by
+  sorry
+
+/-- **Job G (Hitting-time perturbation via monotone comparison).**
+    Given the perturbed Bernoulli ODE (Job E) with error `ε^{(2L-1)/L}`,
+    the actual hitting time differs from the unperturbed one (Job F) by
+    `O(ε^{(2L-1)/L} · t_star) = O(ε^{-(L-2)/L})`, which is `o(ε^{-1/L})`
+    for `L ≥ 2`. Proved by sandwiching the perturbed solution between two
+    unperturbed Bernoulli solutions with rate `λ(1±δ)` and applying Job F
+    to each bound. -/
+lemma actual_critical_time (dat : JEPAData d) (eb : GenEigenbasis dat)
+    (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (r : Fin d)
+    (hODE : ∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Ioo 0 t_max,
+      |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
+       - ((L : ℝ) * projectedCovariance dat eb r
+            * Real.rpow (diagAmplitude dat eb (Wbar t) r) (3 - 1 / L)
+            * (1 - Real.rpow (diagAmplitude dat eb (Wbar t) r) (1 / L)
+                   / (eb.pairs r).rho))|
+      ≤ C * epsilon ^ ((2 * (L : ℝ) - 1) / L)) :
+    ∃ K : ℝ, 0 < K ∧
+    |hittingTime (fun t => diagAmplitude dat eb (Wbar t) r)
+                  (p * (eb.pairs r).rho ^ L) t_max
+       - (1 / projectedCovariance dat eb r)
+         * ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+             (L : ℝ) / ((n : ℝ) * (eb.pairs r).rho ^ (2 * L - n - 1)
+                         * epsilon ^ ((n : ℝ) / L))|
+      ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
+  sorry
+
 /-! ## Section 6.5: Bootstrap Consistency
     **Proved in `BootstrapLemmas.lean`** — see `bootstrap_consistency` there.
     The proof assembles three sub-lemmas (Lemmas B.1–B.3):
