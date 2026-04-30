@@ -485,7 +485,25 @@ lemma bernoulli_partial_fractions (L : ℕ) (hL : 1 ≤ L) (ψ : ℝ)
         -(∑ n ∈ Finset.Ioc 0 (2 * L - 1), 1 / ((n : ℝ) * x ^ n))
         + Real.log x - Real.log (1 - x))
       (1 / (ψ ^ (2 * L) - ψ ^ (2 * L + 1))) ψ := by
-  sorry
+  convert HasDerivAt.sub ( HasDerivAt.add ( HasDerivAt.neg <| HasDerivAt.sum _ ) ( Real.hasDerivAt_log hψ_pos.ne' ) ) ( HasDerivAt.log ( hasDerivAt_id' ψ |> HasDerivAt.const_sub 1 ) <| by linarith ) using 1;
+  any_goals exact Finset.Ioc 0 ( 2 * L - 1 );
+  rotate_left;
+  rotate_left;
+  use fun n x => 1 / ( n * x ^ n );
+  use fun n => -n / ( n * ψ ^ ( n + 1 ) );
+  · intro i hi; convert HasDerivAt.div ( hasDerivAt_const _ _ ) ( HasDerivAt.mul ( hasDerivAt_const _ _ ) ( hasDerivAt_pow i ψ ) ) _ using 1 <;> ring ; norm_num [ hψ_pos.ne' ] ;
+    · field_simp;
+      cases i <;> simp_all +decide [ pow_succ', mul_assoc ];
+    · exact mul_ne_zero ( Nat.cast_ne_zero.mpr ( by linarith [ Finset.mem_Ioc.mp hi ] ) ) ( pow_ne_zero _ hψ_pos.ne' );
+  · ext; norm_num;
+  · -- Simplify the sum of the series
+    have h_sum : ∑ i ∈ Finset.Ioc 0 (2 * L - 1), (1 : ℝ) / ψ ^ (i + 1) = (1 / ψ ^ 2) * (1 - (1 / ψ) ^ (2 * L - 1)) / (1 - (1 / ψ)) := by
+      induction 2 * L - 1 <;> simp_all +decide [ Finset.sum_Ioc_succ_top, pow_succ' ];
+      grind;
+    rcases L with ( _ | L ) <;> simp_all +decide [ Nat.mul_succ, pow_succ' ];
+    simp_all +decide [ div_eq_mul_inv, mul_assoc, mul_comm, mul_left_comm, Finset.mul_sum _ _ _, ne_of_gt ];
+    rw [ Finset.sum_congr rfl fun x hx => by rw [ mul_inv_cancel₀ ( by norm_cast; linarith [ Finset.mem_Ioc.mp hx ] ) ] ] ; simp_all +decide [ ← mul_assoc, ne_of_gt ];
+    grind
 
 /-- **Job F (Littwin Theorem 4.4 — JEPA Bernoulli closed form).**
     The unperturbed JEPA Bernoulli ODE
