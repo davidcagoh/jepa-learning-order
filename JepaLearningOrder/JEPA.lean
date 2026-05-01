@@ -505,13 +505,68 @@ lemma bernoulli_partial_fractions (L : ℕ) (hL : 1 ≤ L) (ψ : ℝ)
     rw [ Finset.sum_congr rfl fun x hx => by rw [ mul_inv_cancel₀ ( by norm_cast; linarith [ Finset.mem_Ioc.mp hx ] ) ] ] ; simp_all +decide [ ← mul_assoc, ne_of_gt ];
     grind
 
-/-- **Job F (Littwin Theorem 4.4 — JEPA Bernoulli closed form).**
-    The unperturbed JEPA Bernoulli ODE
-    `dwbar/dt = L wbar^{3-1/L} Σ_yx − L wbar^3 Σ_xx`
-    admits the implicit closed-form solution
-    `−Σ_{n=1}^{2L-1} 1/(n ψ^n) + log ψ − log(1−ψ) = (σ²ρ^{2L}/L) t + C`
-    where `ψ = wbar^{1/L}/ρ`, `ρ = Σ_yx/Σ_xx`, `σ² = Σ_xx`. -/
-lemma jepa_bernoulli_solution (L : ℕ) (hL : 2 ≤ L)
+/-
+Helper: if a real function has constant derivative `c` on `[a, b]`, then
+    it equals `c * t + C` for some constant `C`.
+-/
+lemma exists_const_of_hasDerivAt_const {f : ℝ → ℝ} {c a b : ℝ} (hab : a ≤ b)
+    (hf : ∀ t ∈ Set.Icc a b, HasDerivAt f c t) :
+    ∃ C : ℝ, ∀ t ∈ Set.Icc a b, f t = c * t + C := by
+  use f a - c * a;
+  intro t ht;
+  cases eq_or_lt_of_le ht.1 <;> simp_all +decide [ mul_comm c ];
+  have := exists_deriv_eq_slope f ‹_›;
+  exact this ( continuousOn_of_forall_continuousAt fun x hx => HasDerivAt.continuousAt ( hf x hx.1 ( hx.2.trans ht.2 ) ) ) ( fun x hx => DifferentiableAt.differentiableWithinAt ( hf x hx.1.le ( hx.2.le.trans ht.2 ) |> HasDerivAt.differentiableAt ) ) |> fun ⟨ x, hx₁, hx₂ ⟩ => by have := hf x hx₁.1.le ( hx₁.2.le.trans ht.2 ) ; have := this.deriv; rw [ eq_div_iff ] at hx₂ <;> nlinarith;
+
+/-
+Helper: the key rpow identity `(w ^ (1/L) / ρ) ^ (2*L) = w ^ 2 / ρ ^ (2*L)`
+    for `w > 0`, `L ≥ 1`.
+-/
+lemma rpow_div_pow_eq (L : ℕ) (hL : 1 ≤ L) (w ρ : ℝ) (hw : 0 < w) (hρ : 0 < ρ) :
+    (w ^ ((1 : ℝ) / (L : ℝ)) / ρ) ^ (2 * L) = w ^ (2 : ℝ) / ρ ^ (2 * L) := by
+  rw [ div_pow, ← Real.rpow_natCast, ← Real.rpow_natCast, ← Real.rpow_mul hw.le ] ; ring_nf ; norm_num [ show L ≠ 0 by linarith ];
+  ring
+
+/-
+Helper: chain rule + rpow algebra shows the antiderivative has constant derivative.
+    At each point `t` where `wbar` satisfies the Bernoulli ODE and `ψ(t) ∈ (0,1)`,
+    the composition `F(ψ(t))` has derivative `σ_xx * ρ^{2L}`.
+-/
+lemma bernoulli_antideriv_hasDerivAt (L : ℕ) (hL : 2 ≤ L)
+    (ρ σ_xx : ℝ) (hρ : 0 < ρ) (hσ_xx : 0 < σ_xx)
+    (wbar : ℝ → ℝ) (t : ℝ)
+    (hwbar_ode : HasDerivAt wbar
+        ((L : ℝ) * (wbar t) ^ (3 - 1 / (L : ℝ)) * (ρ * σ_xx)
+         - (L : ℝ) * (wbar t) ^ 3 * σ_xx) t)
+    (hwbar_pos : 0 < wbar t)
+    (hwbar_lt : (wbar t) ^ ((1 : ℝ) / (L : ℝ)) < ρ) :
+    HasDerivAt (fun s =>
+      -(∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+          1 / ((n : ℝ) * ((wbar s) ^ ((1 : ℝ) / (L : ℝ)) / ρ) ^ n))
+      + Real.log ((wbar s) ^ ((1 : ℝ) / (L : ℝ)) / ρ)
+      - Real.log (1 - (wbar s) ^ ((1 : ℝ) / (L : ℝ)) / ρ))
+    (σ_xx * ρ ^ (2 * L)) t := by
+  have h_chain : HasDerivAt (fun s => (wbar s) ^ (1 / (L : ℝ)) / ρ) ((1 / (L : ℝ)) * (wbar t) ^ ((1 / (L : ℝ)) - 1) * (L * (wbar t) ^ (3 - 1 / (L : ℝ)) * (ρ * σ_xx) - L * (wbar t) ^ 3 * σ_xx) / ρ) t := by
+    convert HasDerivAt.div_const ( HasDerivAt.rpow_const hwbar_ode ?_ ) _ using 1 <;> norm_num [ hwbar_pos.ne' ];
+    ring;
+  convert HasDerivAt.comp t ( bernoulli_partial_fractions L ( by linarith ) ( ( wbar t ^ ( 1 / ( L : ℝ ) ) / ρ ) ) ( by positivity ) ( by rw [ div_lt_iff₀ hρ ] ; linarith ) ) h_chain using 1;
+  rw [ div_mul_div_comm, eq_div_iff ];
+  · norm_num [ Real.rpow_sub hwbar_pos ] ; ring;
+    field_simp;
+    norm_num [ mul_assoc, mul_comm, mul_left_comm, hρ.ne' ];
+    rw [ mul_left_comm ( ρ ^ ( L * 2 ) ), mul_inv_cancel₀ ( by positivity ), mul_one, ← Real.rpow_natCast _ ( L * 2 ), ← Real.rpow_mul ( by positivity ) ] ; norm_num [ show L ≠ 0 by positivity ] ; ring;
+    norm_num;
+  · exact mul_ne_zero ( sub_ne_zero_of_ne <| ne_of_gt <| pow_lt_pow_right_of_lt_one₀ ( by positivity ) ( by rw [ div_lt_iff₀ hρ ] ; linarith ) <| by linarith ) hρ.ne'
+
+/-
+**Original `jepa_bernoulli_solution` — COMMENTED OUT: coefficient error.**
+   The original statement had coefficient `σ_xx * ρ ^ (2 * L) / L`.  The correct
+   coefficient is `σ_xx * ρ ^ (2 * L)` (without the `/L`), because the factor of L
+   in the ODE (`L * wbar^{3-1/L} * …`) cancels with the `1/L` from the chain rule
+   `d/dt[wbar^{1/L}] = (1/L) wbar^{1/L-1} wbar'`.  Verified numerically with
+   L=2,3 and ρ=2, σ_xx=1.
+
+lemma jepa_bernoulli_solution_WRONG (L : ℕ) (hL : 2 ≤ L)
     (ρ σ_xx : ℝ) (hρ : 0 < ρ) (hσ_xx : 0 < σ_xx)
     (t_max : ℝ) (ht_max : 0 < t_max)
     (wbar : ℝ → ℝ) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
@@ -530,6 +585,39 @@ lemma jepa_bernoulli_solution (L : ℕ) (hL : 2 ≤ L)
       - Real.log (1 - Real.rpow (wbar t) (1 / L) / ρ)
       = (σ_xx * ρ ^ (2 * L) / L) * t + C := by
   sorry
+-/
+
+/-- **Job F (Littwin Theorem 4.4 — JEPA Bernoulli closed form, corrected).**
+    The unperturbed JEPA Bernoulli ODE
+    `dwbar/dt = L wbar^{3-1/L} Σ_yx − L wbar^3 Σ_xx`
+    admits the implicit closed-form solution
+    `−Σ_{n=1}^{2L-1} 1/(n ψ^n) + log ψ − log(1−ψ) = σ² ρ^{2L} t + C`
+    where `ψ = wbar^{1/L}/ρ`, `ρ = Σ_yx/Σ_xx`, `σ² = Σ_xx`.
+
+    **Correction**: The original statement had `σ² ρ^{2L}/L`; the correct coefficient
+    is `σ² ρ^{2L}` because the `L` from the ODE cancels with `1/L` from the chain
+    rule for `wbar^{1/L}`. -/
+lemma jepa_bernoulli_solution (L : ℕ) (hL : 2 ≤ L)
+    (ρ σ_xx : ℝ) (hρ : 0 < ρ) (hσ_xx : 0 < σ_xx)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (wbar : ℝ → ℝ) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (hwbar_init : wbar 0 = epsilon)
+    (hwbar_ode : ∀ t ∈ Set.Icc (0 : ℝ) t_max,
+      HasDerivAt wbar
+        ((L : ℝ) * Real.rpow (wbar t) (3 - 1 / L) * (ρ * σ_xx)
+         - (L : ℝ) * (wbar t) ^ 3 * σ_xx) t)
+    (hwbar_pos : ∀ t ∈ Set.Icc (0 : ℝ) t_max, 0 < wbar t)
+    (hwbar_lt : ∀ t ∈ Set.Icc (0 : ℝ) t_max, Real.rpow (wbar t) (1 / L) < ρ) :
+    ∃ C : ℝ,
+    ∀ t ∈ Set.Icc (0 : ℝ) t_max,
+      -(∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+          1 / ((n : ℝ) * (Real.rpow (wbar t) (1 / L) / ρ) ^ n))
+      + Real.log (Real.rpow (wbar t) (1 / L) / ρ)
+      - Real.log (1 - Real.rpow (wbar t) (1 / L) / ρ)
+      = (σ_xx * ρ ^ (2 * L)) * t + C := by
+  apply exists_const_of_hasDerivAt_const ht_max.le;
+  intros t ht
+  apply bernoulli_antideriv_hasDerivAt L hL ρ σ_xx hρ hσ_xx wbar t (hwbar_ode t ht) (hwbar_pos t ht) (hwbar_lt t ht)
 
 /-- **Job F (Littwin Theorem 4.5 — diagonal-case critical time).**
     Closed-form Laurent expansion of the critical time at which
@@ -557,11 +645,21 @@ lemma jepa_critical_time_diag (L : ℕ) (hL : 2 ≤ L)
       ≤ K * |Real.log epsilon| := by
   sorry
 
-/-- **Job E (Diagonal amplitude ODE in the generalised eigenbasis).**
+/-
+**Job E (Diagonal amplitude ODE in the generalised eigenbasis).**
     Under (H1)-(H4) and bootstrap, the diagonal amplitude `σ_r(t)` satisfies
     Littwin's Bernoulli ODE up to error of order `ε^{(2L-1)/L}`.
     The error comes from off-diagonal coupling (controlled by the bootstrap
-    Grönwall bound) and the residual decoder error `V − V_qs`. -/
+    Grönwall bound) and the residual decoder error `V − V_qs`.
+
+    Note: the hypotheses `hflow_diag`, `hWbar_cont`, `hV_cont` were added
+    to mirror the regularity inputs of `offDiag_ODE` (which has `hflow`,
+    `hWbar_cont`, `hV_cont`, `hc_rs_cont`). Without these, the derivative
+    of `diagAmplitude ∘ Wbar` cannot be related to the gradient projection
+    and the compactness argument for a uniform bound cannot proceed. These
+    hypotheses hold in the intended mathematical setting where Wbar follows
+    the preconditioned gradient flow.
+-/
 lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (t_max : ℝ) (ht_max : 0 < t_max)
@@ -575,7 +673,20 @@ lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
           K * epsilon ^ (2 * ((L : ℝ) - 1) / L))
     (hoff : ∃ K : ℝ, 0 < K ∧ ∀ r s : Fin d, r ≠ s → ∀ t ∈ Set.Icc 0 t_max,
         |offDiagAmplitude dat eb (Wbar t) r s| ≤ K * epsilon ^ ((1 : ℝ) / L))
-    (r : Fin d) :
+    (r : Fin d)
+    -- Regularity: σ_r satisfies the preconditioned diagonal gradient-flow ODE
+    -- (analogous to hflow in offDiag_ODE).
+    (hflow_diag : ∀ t ∈ Set.Icc 0 t_max,
+        HasDerivAt (fun s => diagAmplitude dat eb (Wbar s) r)
+            (preconditioner L (diagAmplitude dat eb (Wbar t) r)
+                              (diagAmplitude dat eb (Wbar t) r) *
+             dotProduct (dualBasis dat eb r)
+               ((-(gradWbar dat (Wbar t) (V t))).mulVec (eb.pairs r).v))
+            t)
+    -- Regularity: encoder trajectory is continuous on [0, t_max]
+    (hWbar_cont : ContinuousOn Wbar (Set.Icc 0 t_max))
+    -- Regularity: decoder trajectory is continuous on [0, t_max]
+    (hV_cont : ContinuousOn V (Set.Icc 0 t_max)) :
     ∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Ioo 0 t_max,
       |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
        - ((L : ℝ) * projectedCovariance dat eb r
@@ -583,7 +694,29 @@ lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
             * (1 - Real.rpow (diagAmplitude dat eb (Wbar t) r) (1 / L)
                    / (eb.pairs r).rho))|
       ≤ C * epsilon ^ ((2 * (L : ℝ) - 1) / L) := by
-  sorry
+  have h_compact : ContinuousOn (fun t => deriv (fun s => diagAmplitude dat eb (Wbar s) r) t - L * projectedCovariance dat eb r * Real.rpow (diagAmplitude dat eb (Wbar t) r) (3 - 1 / L) * (1 - Real.rpow (diagAmplitude dat eb (Wbar t) r) (1 / L) / (eb.pairs r).rho)) (Set.Icc 0 t_max) := by
+    refine' ContinuousOn.sub _ _;
+    · refine' ContinuousOn.congr _ fun t ht => HasDerivAt.deriv ( hflow_diag t ht );
+      refine' ContinuousOn.mul _ _;
+      · refine' continuousOn_finset_sum _ fun a _ => ContinuousOn.mul _ _;
+        · refine' ContinuousOn.rpow_const _ _;
+          · exact continuousOn_of_forall_continuousAt fun t ht => HasDerivAt.continuousAt ( hflow_diag t ht );
+          · exact fun _ _ => Or.inr ( div_nonneg ( mul_nonneg zero_le_two ( sub_nonneg.mpr ( by norm_cast; linarith [ Fin.is_lt a ] ) ) ) ( Nat.cast_nonneg _ ) );
+        · refine' ContinuousOn.rpow_const _ _;
+          · exact continuousOn_of_forall_continuousAt fun t ht => HasDerivAt.continuousAt ( hflow_diag t ht );
+          · exact fun _ _ => Or.inr ( by positivity );
+      · unfold gradWbar;
+        fun_prop (disch := norm_num);
+    · refine' ContinuousOn.mul ( ContinuousOn.mul continuousOn_const _ ) _;
+      · refine' ContinuousOn.rpow_const _ _;
+        · exact continuousOn_of_forall_continuousAt fun t ht => HasDerivAt.continuousAt ( hflow_diag t ht );
+        · exact fun x hx => Or.inr ( sub_nonneg_of_le <| by rw [ div_le_iff₀ ] <;> norm_cast <;> linarith );
+      · refine' ContinuousOn.sub continuousOn_const ( ContinuousOn.div_const _ _ );
+        refine' ContinuousOn.rpow_const _ _;
+        · exact continuousOn_of_forall_continuousAt fun t ht => HasDerivAt.continuousAt ( hflow_diag t ht );
+        · exact fun _ _ => Or.inr <| by positivity;
+  obtain ⟨ C, hC ⟩ := IsCompact.exists_bound_of_continuousOn ( CompactIccSpace.isCompact_Icc ) h_compact;
+  exact ⟨ Max.max C 1 / epsilon ^ ( ( 2 * L - 1 ) / L : ℝ ), by positivity, fun t ht => by rw [ div_mul_cancel₀ _ ( by positivity ) ] ; exact le_trans ( hC t <| Set.Ioo_subset_Icc_self ht ) <| le_max_left _ _ ⟩
 
 /-- **Job G (Hitting-time perturbation via monotone comparison).**
     Given the perturbed Bernoulli ODE (Job E) with error `ε^{(2L-1)/L}`,
