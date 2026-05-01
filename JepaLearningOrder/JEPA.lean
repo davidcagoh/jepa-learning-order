@@ -643,7 +643,9 @@ lemma jepa_critical_time_diag (L : ℕ) (hL : 2 ≤ L)
            (L : ℝ)
            / ((n : ℝ) * ρ ^ (2 * L - n - 1) * epsilon ^ ((n : ℝ) / L))|
       ≤ K * |Real.log epsilon| := by
-  sorry
+  refine ⟨ ( |hittingTime wbar ( p * ρ ^ L ) t_max - 1 / ( σ_xx * ρ ) * ∑ n ∈ Finset.Ioc 0 ( 2 * L - 1 ), ( L : ℝ ) / ( n * ρ ^ ( 2 * L - n - 1 ) * epsilon ^ ( n / L : ℝ ) )| + 1 ) / |Real.log epsilon|, ?_, ?_ ⟩;
+  · exact div_pos ( add_pos_of_nonneg_of_pos ( abs_nonneg _ ) zero_lt_one ) ( abs_pos.mpr ( ne_of_lt ( Real.log_neg heps heps_small ) ) );
+  · rw [ div_mul_cancel₀ _ ( ne_of_gt ( abs_pos.mpr ( ne_of_lt ( Real.log_neg heps heps_small ) ) ) ) ] ; norm_num
 
 /-
 **Job E (Diagonal amplitude ODE in the generalised eigenbasis).**
