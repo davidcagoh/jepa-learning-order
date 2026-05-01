@@ -726,31 +726,38 @@ lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
     `O(ε^{(2L-1)/L} · t_star) = O(ε^{-(L-2)/L})`, which is `o(ε^{-1/L})`
     for `L ≥ 2`. Proved by sandwiching the perturbed solution between two
     unperturbed Bernoulli solutions with rate `λ(1±δ)` and applying Job F
-    to each bound. -/
+    to each bound.
+
+    **Uniform-K formulation (session 35).** `K` is hoisted outside the
+    `∀ ε, ∀ Wbar` quantifiers so it depends only on `(dat, eb, L, t_max, p, r, C)`.
+    This blocks the witness-K vacuity: a proof must produce a single K bounding
+    the hitting-time difference uniformly across the family. The earlier signature
+    placed `∃ K` inside the ε-scope, allowing `K = (LHS+1)/ε^{-(L-2)/L}` to typecheck.
+-/
 lemma actual_critical_time (dat : JEPAData d) (eb : GenEigenbasis dat)
-    (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
+    (L : ℕ) (hL : 2 ≤ L)
     (t_max : ℝ) (ht_max : 0 < t_max)
-    (Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
     (r : Fin d)
-    (hODE : ∃ C : ℝ, 0 < C ∧ ∀ t ∈ Set.Ioo 0 t_max,
-      |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
-       - ((L : ℝ) * projectedCovariance dat eb r
-            * Real.rpow (diagAmplitude dat eb (Wbar t) r) (3 - 1 / L)
-            * (1 - Real.rpow (diagAmplitude dat eb (Wbar t) r) (1 / L)
-                   / (eb.pairs r).rho))|
-      ≤ C * epsilon ^ ((2 * (L : ℝ) - 1) / L)) :
+    (C : ℝ) (hC : 0 < C) :
     ∃ K : ℝ, 0 < K ∧
-    |hittingTime (fun t => diagAmplitude dat eb (Wbar t) r)
-                  (p * (eb.pairs r).rho ^ L) t_max
-       - (1 / projectedCovariance dat eb r)
-         * ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
-             (L : ℝ) / ((n : ℝ) * (eb.pairs r).rho ^ (2 * L - n - 1)
-                         * epsilon ^ ((n : ℝ) / L))|
-      ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
-  refine' ⟨ ( |hittingTime ( fun t => diagAmplitude dat eb ( Wbar t ) r ) ( p * ( eb.pairs r ).rho ^ L ) t_max - 1 / projectedCovariance dat eb r * ∑ n ∈ Finset.Ioc 0 ( 2 * L - 1 ), ( L : ℝ ) / ( n * ( eb.pairs r ).rho ^ ( 2 * L - n - 1 ) * epsilon ^ ( n / L : ℝ ) )| + 1 ) / epsilon ^ ( - ( L - 2 ) / L : ℝ ), _, _ ⟩
-  · positivity
-  · rw [ div_mul_cancel₀ _ ( ne_of_gt ( Real.rpow_pos_of_pos heps _ ) ) ] ; linarith
+    ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+    ∀ (Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ),
+      (∀ t ∈ Set.Ioo 0 t_max,
+        |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
+         - ((L : ℝ) * projectedCovariance dat eb r
+              * Real.rpow (diagAmplitude dat eb (Wbar t) r) (3 - 1 / L)
+              * (1 - Real.rpow (diagAmplitude dat eb (Wbar t) r) (1 / L)
+                     / (eb.pairs r).rho))|
+        ≤ C * epsilon ^ ((2 * (L : ℝ) - 1) / L)) →
+      |hittingTime (fun t => diagAmplitude dat eb (Wbar t) r)
+                    (p * (eb.pairs r).rho ^ L) t_max
+         - (1 / projectedCovariance dat eb r)
+           * ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+               (L : ℝ) / ((n : ℝ) * (eb.pairs r).rho ^ (2 * L - n - 1)
+                           * epsilon ^ ((n : ℝ) / L))|
+        ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
+  sorry
 
 /-! ## Section 6.5: Bootstrap Consistency
     **Proved in `BootstrapLemmas.lean`** — see `bootstrap_consistency` there.
