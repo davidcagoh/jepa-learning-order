@@ -758,7 +758,78 @@ lemma bernoulli_laurent_bound (L : ℕ) (hL : 2 ≤ L)
                (L : ℝ) / ((n : ℝ) * rho_r ^ (2 * L - n - 1)
                            * epsilon ^ ((n : ℝ) / L))|
         ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
-  sorry
+  -- ═══ Step 1: Gronwall comparison (sorry'd) ═══
+  -- Construct the exact Bernoulli ODE solution f₀ via Picard-Lindelöf with
+  -- f₀(0) = ε, then bound |τ_f − τ_{f₀}| via Gronwall on |f − f₀|.
+  -- K₁ is proportional to C_ode and depends on the Lipschitz constant of F
+  -- on a compact interval and the minimum speed near the threshold.
+  have h_gronwall : ∃ K₁ : ℝ, 0 < K₁ ∧
+      ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+      ∀ (f : ℝ → ℝ),
+        f 0 = epsilon →
+        (∀ t ∈ Set.Ioo 0 t_max,
+          |deriv f t - ((L : ℝ) * lam_r
+                * Real.rpow (f t) (3 - 1 / (L : ℝ))
+                * (1 - Real.rpow (f t) (1 / (L : ℝ)) / rho_r))|
+          ≤ C_ode * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ))) →
+        ∃ (f₀ : ℝ → ℝ),
+          f₀ 0 = epsilon ∧
+          (∀ t ∈ Set.Ioo 0 t_max,
+            deriv f₀ t = (L : ℝ) * lam_r
+                  * Real.rpow (f₀ t) (3 - 1 / (L : ℝ))
+                  * (1 - Real.rpow (f₀ t) (1 / (L : ℝ)) / rho_r)) ∧
+          |hittingTime f (p * rho_r ^ L) t_max
+             - hittingTime f₀ (p * rho_r ^ L) t_max|
+            ≤ K₁ * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ)) := by
+    sorry -- Gronwall: Picard-Lindelöf existence + ODE comparison + hitting time
+  -- ═══ Step 2: Laurent bound for exact Bernoulli ODE (named sorry) ═══
+  have h_laurent : ∃ K₂ : ℝ, 0 < K₂ ∧
+      ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+      ∀ (f₀ : ℝ → ℝ),
+        f₀ 0 = epsilon →
+        (∀ t ∈ Set.Ioo 0 t_max,
+          deriv f₀ t = (L : ℝ) * lam_r
+                * Real.rpow (f₀ t) (3 - 1 / (L : ℝ))
+                * (1 - Real.rpow (f₀ t) (1 / (L : ℝ)) / rho_r)) →
+        |hittingTime f₀ (p * rho_r ^ L) t_max
+           - (1 / lam_r)
+             * ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+                 (L : ℝ) / ((n : ℝ) * rho_r ^ (2 * L - n - 1)
+                               * epsilon ^ ((n : ℝ) / (L : ℝ)))|
+          ≤ K₂ * epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) := by
+    sorry  -- Laurent analysis: Littwin 2024 Thm 4.5 applied to f₀
+  -- ═══ Step 3: Triangle inequality + exponent comparison ═══
+  obtain ⟨K₁, hK₁_pos, hK₁_bound⟩ := h_gronwall
+  obtain ⟨K₂, hK₂_pos, hK₂_bound⟩ := h_laurent
+  refine ⟨K₁ + K₂, by positivity, ?_⟩
+  intro epsilon heps heps_lt f hf0 hode
+  obtain ⟨f₀, hf₀_init, hf₀_ode, h_gronwall_bd⟩ :=
+    hK₁_bound epsilon heps heps_lt f hf0 hode
+  have h_laurent_bd :=
+    hK₂_bound epsilon heps heps_lt f₀ hf₀_init hf₀_ode
+  set S := (1 / lam_r) * ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+      (L : ℝ) / ((n : ℝ) * rho_r ^ (2 * L - n - 1) * epsilon ^ ((n : ℝ) / (L : ℝ)))
+    with hS_def
+  set τ_f := hittingTime f (p * rho_r ^ L) t_max with hτ_f_def
+  set τ_f₀ := hittingTime f₀ (p * rho_r ^ L) t_max with hτ_f₀_def
+  have h_tri : |τ_f - S| ≤ |τ_f - τ_f₀| + |τ_f₀ - S| := by
+    have : τ_f - S = (τ_f - τ_f₀) + (τ_f₀ - S) := by ring
+    rw [this]; exact abs_add_le _ _
+  have h_exp_le : epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ)) ≤
+      epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) := by
+    apply Real.rpow_le_rpow_of_exponent_ge heps heps_lt.le
+    rw [div_le_div_iff_of_pos_right (Nat.cast_pos.mpr (by omega))]
+    have : (2 : ℝ) ≤ (L : ℝ) := Nat.ofNat_le_cast.mpr hL
+    linarith
+  calc |τ_f - S|
+      ≤ |τ_f - τ_f₀| + |τ_f₀ - S| := h_tri
+    _ ≤ K₁ * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ)) +
+        K₂ * epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) :=
+        add_le_add h_gronwall_bd h_laurent_bd
+    _ ≤ K₁ * epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) +
+        K₂ * epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) := by
+        linarith [mul_le_mul_of_nonneg_left h_exp_le hK₁_pos.le]
+    _ = (K₁ + K₂) * epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) := by ring
 
 /-- **Job G (Hitting-time perturbation via monotone comparison).**
     Given the perturbed Bernoulli ODE (Job E) with error `ε^{(2L-1)/L}`,
