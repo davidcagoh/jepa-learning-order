@@ -720,6 +720,46 @@ lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
   obtain ⟨ C, hC ⟩ := IsCompact.exists_bound_of_continuousOn ( CompactIccSpace.isCompact_Icc ) h_compact;
   exact ⟨ Max.max C 1 / epsilon ^ ( ( 2 * L - 1 ) / L : ℝ ), by positivity, fun t ht => by rw [ div_mul_cancel₀ _ ( by positivity ) ] ; exact le_trans ( hC t <| Set.Ioo_subset_Icc_self ht ) <| le_max_left _ _ ⟩
 
+/-- **Step 2 (Bernoulli Laurent bound).**
+    For a scalar function `f` satisfying the approximate Bernoulli ODE
+    `|f' − L λ f^{3−1/L}(1 − f^{1/L}/ρ)| ≤ C_ode · ε^{(2L−1)/L}`,
+    the hitting time at threshold `p · ρ^L` differs from the Laurent sum
+    `(1/λ) Σ_{n=1}^{2L−1} L/(n ρ^{2L−n−1} ε^{n/L})`
+    by at most `K · ε^{−(L−2)/L}`.
+
+    Internally the proof would proceed by a **Gronwall sandwich**:
+      • Construct upper/lower comparison solutions `f_±` satisfying
+        exact Bernoulli ODEs with perturbed rates `λ(1±δ)`,
+        where `δ = O(ε^{(2L−1)/L}/f^{3−1/L})`.
+      • By the ODE comparison principle `f₋(t) ≤ f(t) ≤ f₊(t)`,
+        so the hitting times satisfy `τ₊ ≤ τ_f ≤ τ₋`.
+      • Apply `jepa_critical_time_diag` to each bounding solution
+        to relate `τ_±` to the Laurent sum with the original rate `λ`.
+      • The difference `|τ_± − Laurent_sum|` is `O(ε^{−(L−2)/L})`.
+
+    Left as a named `sorry` per specification. -/
+lemma bernoulli_laurent_bound (L : ℕ) (hL : 2 ≤ L)
+    (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (C_ode : ℝ) (hC : 0 < C_ode) :
+    ∃ K : ℝ, 0 < K ∧
+    ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+    ∀ (f : ℝ → ℝ),
+      f 0 = epsilon →
+      (∀ t ∈ Set.Ioo 0 t_max,
+        |deriv f t - ((L : ℝ) * lam_r
+              * Real.rpow (f t) (3 - 1 / L)
+              * (1 - Real.rpow (f t) (1 / L) / rho_r))|
+        ≤ C_ode * epsilon ^ ((2 * (L : ℝ) - 1) / L)) →
+      |hittingTime f (p * rho_r ^ L) t_max
+         - (1 / lam_r)
+           * ∑ n ∈ Finset.Ioc 0 (2 * L - 1),
+               (L : ℝ) / ((n : ℝ) * rho_r ^ (2 * L - n - 1)
+                           * epsilon ^ ((n : ℝ) / L))|
+        ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
+  sorry
+
 /-- **Job G (Hitting-time perturbation via monotone comparison).**
     Given the perturbed Bernoulli ODE (Job E) with error `ε^{(2L-1)/L}`,
     the actual hitting time differs from the unperturbed one (Job F) by
@@ -743,6 +783,7 @@ lemma actual_critical_time (dat : JEPAData d) (eb : GenEigenbasis dat)
     ∃ K : ℝ, 0 < K ∧
     ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
     ∀ (Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ),
+      diagAmplitude dat eb (Wbar 0) r = epsilon →
       (∀ t ∈ Set.Ioo 0 t_max,
         |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
          - ((L : ℝ) * projectedCovariance dat eb r
@@ -757,7 +798,24 @@ lemma actual_critical_time (dat : JEPAData d) (eb : GenEigenbasis dat)
                (L : ℝ) / ((n : ℝ) * (eb.pairs r).rho ^ (2 * L - n - 1)
                            * epsilon ^ ((n : ℝ) / L))|
         ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
-  sorry
+  -- ─── Gronwall sandwich: reduce matrix JEPA ODE to scalar Bernoulli ODE ───
+  -- Step 1: Extract scalar parameters lam_r = projectedCovariance, rho_r = rho
+  have hlam_pos : (0 : ℝ) < projectedCovariance dat eb r :=
+    mul_pos (eb.hpos r) (eb.pairs r).hmu_pos
+  -- Step 2: Apply the Bernoulli Laurent bound (named sorry)
+  obtain ⟨K, hK_pos, hK_bound⟩ :=
+    bernoulli_laurent_bound L hL
+      (projectedCovariance dat eb r) ((eb.pairs r).rho)
+      hlam_pos (eb.hpos r)
+      p hp hp_lt t_max ht_max C hC
+  -- Step 3: Instantiate with f(t) = σ_r(t) = diagAmplitude(Wbar(t), r)
+  --   The Gronwall sandwich inside bernoulli_laurent_bound provides
+  --   upper/lower Bernoulli comparison solutions bounding the perturbed
+  --   diagonal amplitude, yielding the ε^{-(L-2)/L} hitting-time error.
+  exact ⟨K, hK_pos, fun epsilon heps heps_lt Wbar hwbar_init hode =>
+    hK_bound epsilon heps heps_lt
+      (fun t => diagAmplitude dat eb (Wbar t) r)
+      hwbar_init hode⟩
 
 /-! ## Section 6.5: Bootstrap Consistency
     **Proved in `BootstrapLemmas.lean`** — see `bootstrap_consistency` there.
