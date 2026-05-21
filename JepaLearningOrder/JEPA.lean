@@ -662,6 +662,12 @@ lemma jepa_critical_time_diag (L : ℕ) (hL : 2 ≤ L)
     hypotheses hold in the intended mathematical setting where Wbar follows
     the preconditioned gradient flow.
 -/
+-- ⚠ DEPRECATED (session 90, 2026-05-21). ODE bracket `(1 - σ^(1/L)/ρ)` is
+--   INVERTED; correct form is `(ρ - σ^L)`. Empirical fit
+--   (jepa-rho-recovery/experiments/ode_form_fit.py) shows this form predicts
+--   wrong sign of σ̇ on half the spectrum. Use `Corrected.diagAmp_ODE_corrected`.
+--   This declaration is preserved as historical record only.
+@[deprecated "Inverted ODE form; use Corrected.diagAmp_ODE_corrected"]
 lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (t_max : ℝ) (ht_max : 0 < t_max)
@@ -738,6 +744,11 @@ lemma diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
       • The difference `|τ_± − Laurent_sum|` is `O(ε^{−(L−2)/L})`.
 
     Left as a named `sorry` per specification. -/
+-- ⚠ DEPRECATED (session 90, 2026-05-21). Hitting-time threshold `p · ρ^L` is
+--   for the inverted ODE form; under the correct Saxe form the threshold is
+--   `p · ρ^(1/L)` and the asymptotic has a SINGLE divergent term (not 2L-1
+--   Laurent terms). Use `Corrected.bernoulli_saxe_bound_corrected`.
+@[deprecated "Inverted ODE form; use Corrected.bernoulli_saxe_bound_corrected"]
 lemma bernoulli_laurent_bound (L : ℕ) (hL : 2 ≤ L)
     (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
@@ -845,6 +856,9 @@ lemma bernoulli_laurent_bound (L : ℕ) (hL : 2 ≤ L)
     the hitting-time difference uniformly across the family. The earlier signature
     placed `∃ K` inside the ε-scope, allowing `K = (LHS+1)/ε^{-(L-2)/L}` to typecheck.
 -/
+-- ⚠ DEPRECATED (session 90, 2026-05-21). Composes inverted-form diagAmp_ODE
+--   and bernoulli_laurent_bound. Use `Corrected.actual_critical_time_corrected`.
+@[deprecated "Inverted ODE form; use Corrected.actual_critical_time_corrected"]
 lemma actual_critical_time (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L)
     (t_max : ℝ) (ht_max : 0 < t_max)

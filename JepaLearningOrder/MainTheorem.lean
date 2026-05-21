@@ -232,6 +232,14 @@ lemma laurent_separation_dominates
     - `actual_critical_time` for both `r` and `s` (giving uniform K_r, K_s
       independent of ε), and
     - `laurent_separation_dominates` (the ε-asymptotic algebra). -/
+-- ⚠ DEPRECATED (session 90, 2026-05-21). This headline theorem is built on
+--   paper-1's inverted-ODE-form lemmas (diagAmp_ODE, bernoulli_laurent_bound,
+--   actual_critical_time). The ORDERING claim survives empirically (direction
+--   of motion is correct), but quantitative bounds and hitting-time thresholds
+--   `p · ρ^L` are wrong under the actual JEPA dynamics. The corrected version
+--   `Corrected.JEPA_dynamics_ordering_corrected` lives in JepaLearningOrder.Corrected
+--   and uses threshold `p · ρ^(1/L)` + single-pole asymptotic. See CORRECTION_NOTE.md.
+@[deprecated "Inverted ODE form; use Corrected.JEPA_dynamics_ordering_corrected"]
 theorem JEPA_dynamics_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L)
     (t_max : ℝ) (ht_max : 0 < t_max)

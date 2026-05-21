@@ -388,4 +388,81 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
   rw [← hmu_eq]
   exact hode t ht
 
+/-! ## §4. Corrected headline ordering theorem
+
+    **OPEN QUESTION (session 90).** Under the inverted-form Laurent sum
+    (paper-1 original), the dynamics-level separation between features `r`
+    and `s` was established via `laurent_separation_dominates`, which used
+    **ρ-ordering** (`ρ_s < ρ_r`) directly: the Laurent denominator
+    `ρ^(2L-n-1)` makes 1/ρ-larger features dominate the asymptotic.
+
+    Under the corrected single-pole asymptotic, the divergent term is
+    `(1/(μρ(L-1))) · ε^{-(L-1)/L} = (1/(λ(L-1))) · ε^{-(L-1)/L}`
+    (since μρ = λ). This depends ONLY on `λ`, not ρ. So:
+
+    * If `λ_r > λ_s` strictly, the divergent terms separate cleanly.
+      Hitting time τ_s − τ_r = (1/λ_s − 1/λ_r)·ε^{-(L-1)/L}/(L-1) + bounded,
+      with positive leading coefficient.
+
+    * If `λ_r = λ_s` (the boundary case allowed by original `hlam`), the
+      divergent terms CANCEL. Separation comes only from the bounded(ε)
+      correction, which depends on ρ but at a strictly slower rate.
+      Whether ρ-ordering survives in this regime is an OPEN QUESTION
+      that depends on the structure of the bounded correction.
+
+    Below: corrected headline theorem under the **strict-λ-ordering**
+    hypothesis (clean separation in leading order). The relaxation to
+    `λ_r ≥ λ_s` (matching the original) requires analyzing the
+    bounded correction; defer to next session.
+-/
+
+/-- **Corrected `JEPA_dynamics_ordering`.**
+
+    Under strict λ-ordering `λ_s < λ_r`, the corrected single-pole
+    asymptotic gives an asymptotic separation τ_s > τ_r for ε small.
+
+    Compared to the original `JEPA_dynamics_ordering`, this uses:
+    * Saxe-form ODE bracket `(ρ − σ^L)` instead of inverted `(1 − σ^{1/L}/ρ)`
+    * Threshold `p · ρ^{1/L}` instead of `p · ρ^L`
+    * Strict λ-ordering instead of `λ_r ≥ λ_s ∧ ρ_r > ρ_s`
+    * Single divergent term ε^{-(L-1)/L} instead of 2L−1 Laurent terms
+
+    **Proof:** queued (composes `actual_critical_time_corrected` for r and s
+    with a `λ-separation` lemma that's a direct comparison of two reciprocals,
+    much simpler than the original `laurent_separation_dominates`). -/
+theorem JEPA_dynamics_ordering_corrected (dat : JEPAData d) (eb : GenEigenbasis dat)
+    (L : ℕ) (hL : 2 ≤ L)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (Wbar : ℝ → ℝ → Matrix (Fin d) (Fin d) ℝ)
+    (r s : Fin d)
+    (hlam : projectedCovariance dat eb s < projectedCovariance dat eb r)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (hinit_r : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      diagAmplitude dat eb (Wbar epsilon 0) r = epsilon)
+    (hinit_s : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      diagAmplitude dat eb (Wbar epsilon 0) s = epsilon)
+    (hode_r : ∃ C_r : ℝ, 0 < C_r ∧ ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∀ t ∈ Set.Ioo 0 t_max,
+        |deriv (fun u => diagAmplitude dat eb (Wbar epsilon u) r) t
+         - ((L : ℝ) * (eb.pairs r).mu
+              * Real.rpow (diagAmplitude dat eb (Wbar epsilon t) r) (2 - 1 / L)
+              * ((eb.pairs r).rho
+                  - (diagAmplitude dat eb (Wbar epsilon t) r) ^ L))|
+        ≤ C_r * epsilon ^ ((2 * (L : ℝ) - 1) / L))
+    (hode_s : ∃ C_s : ℝ, 0 < C_s ∧ ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∀ t ∈ Set.Ioo 0 t_max,
+        |deriv (fun u => diagAmplitude dat eb (Wbar epsilon u) s) t
+         - ((L : ℝ) * (eb.pairs s).mu
+              * Real.rpow (diagAmplitude dat eb (Wbar epsilon t) s) (2 - 1 / L)
+              * ((eb.pairs s).rho
+                  - (diagAmplitude dat eb (Wbar epsilon t) s) ^ L))|
+        ≤ C_s * epsilon ^ ((2 * (L : ℝ) - 1) / L)) :
+    ∃ epsilon_0 : ℝ, 0 < epsilon_0 ∧ epsilon_0 < 1 ∧
+      ∀ epsilon : ℝ, 0 < epsilon → epsilon < epsilon_0 →
+        hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) r)
+                     (p * Real.rpow (eb.pairs r).rho ((1 : ℝ) / L)) t_max
+        < hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) s)
+                     (p * Real.rpow (eb.pairs s).rho ((1 : ℝ) / L)) t_max := by
+  sorry
+
 end JepaLearningOrder
