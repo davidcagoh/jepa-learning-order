@@ -211,6 +211,20 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
                   * (eb.pairs r).rho * ((L : ℝ) - 1)))
            * epsilon ^ (-((L : ℝ) - 1) / L)|
         ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
-  sorry
+  -- Aristotle job b853ca6d (session 90). Mechanical composition.
+  have hlam_pos : (0 : ℝ) < projectedCovariance dat eb r :=
+    mul_pos (eb.hpos r) (eb.pairs r).hmu_pos
+  have hmu_eq : (eb.pairs r).mu = projectedCovariance dat eb r / (eb.pairs r).rho := by
+    simp [projectedCovariance, mul_div_cancel_left₀ _ (ne_of_gt (eb.hpos r))]
+  obtain ⟨K, hK_pos, hK_bound⟩ :=
+    bernoulli_saxe_bound_corrected L hL
+      (projectedCovariance dat eb r) ((eb.pairs r).rho)
+      hlam_pos (eb.hpos r)
+      p hp hp_lt t_max ht_max C hC
+  refine ⟨K, hK_pos, fun epsilon heps heps_lt Wbar hwbar_init hode => ?_⟩
+  apply hK_bound epsilon heps heps_lt (fun t => diagAmplitude dat eb (Wbar t) r) hwbar_init
+  intro t ht
+  rw [← hmu_eq]
+  exact hode t ht
 
 end JepaLearningOrder
