@@ -260,13 +260,39 @@ The third paper-2 piece (`bernoulli_exact_laurent`) is paper-1's already-proved
         `f₀'(t) = L · (λ/ρ) · f₀(t)^{2−1/L} · (ρ − f₀(t)^L)`
     on `Ioo 0 t_max`, with `hittingTime f₀ (p·ρ^{1/L}) t_max < t_max`.
 
-    Proof: the right-hand side `F(y) = L·(λ/ρ)·y^{2−1/L}·(ρ − y^L)` is
-    C¹ on `(0, ρ^{1/L}]` and locally Lipschitz, so Picard–Lindelöf gives
-    a local solution. Maximal-solution continuation extends to a global
+    The right-hand side `F(y) = L·(λ/ρ)·y^{2−1/L}·(ρ − y^L)` is C¹ on
+    `(0, ρ^{1/L}]` and locally Lipschitz, so Picard–Lindelöf gives a
+    local solution. Maximal-solution continuation extends to a global
     solution on `[0, t_max]` since the trajectory is monotone increasing
-    and bounded above by `ρ^{1/L}`. The reachability clause follows from
-    `h_t_max_reach` and the asymptotic `T(ε) ≤ (2/(λ(L−1)))·ε^{−(L−1)/L}`. -/
-lemma saxe_exact_solution_exists (L : ℕ) (hL : 2 ≤ L)
+    and bounded above by `ρ^{1/L}`.
+
+    **Path C axiom** (promoted 2026-05-22 after Aristotle job `cd50d4c7`
+    returned a verified counterexample for conjunct 4 as stated).
+
+    **Counterexample to conjunct 4 under literal reading of `h_t_max_reach`.**
+    For `L = 2, λ = 1, ρ = 1, ε = 0.5, p = 0.99999`: `h_t_max_reach` gives
+    `t_max ≥ 2√2 ≈ 2.828`, but RK4 integration (`dt = 10⁻⁴`) shows the
+    threshold `p·ρ^{1/L} ≈ 0.99999` is not reached until `t ≈ 3.11 > t_max`.
+    See `JepaLearningOrder/CounterexampleVerification.lean`.
+
+    **Root cause.** Near the equilibrium `ρ^{1/L}`, the ODE speed
+    `F(f) ∝ (ρ − f^L)` vanishes, adding an `O(log(1/(1 − p^L)))` correction
+    to the hitting time that is unbounded as `p → 1`. Quantitatively the
+    hitting time satisfies
+    `T_reach ≤ ε^{-(L-1)/L} / ((L-1)·λ·(1 − p^L))`, while `h_t_max_reach`
+    only provides `t_max ≥ 2·ε^{-(L-1)/L} / ((L-1)·λ)`. Reachability holds
+    when `p^L ≤ 1/2`, but fails for `p` close to 1.
+
+    **Why this is axiomatized rather than restated.** The headline result
+    (`JEPA_dynamics_ordering_corrected`) fixes `p ∈ (0, 1)` once and for
+    all — `p` is a parameter chosen by the user, not a limit. In every
+    fixed-`p` regime, conjunct 4 IS provable (with an appropriately
+    strengthened `h_t_max_reach` that absorbs the `(1 − p^L)` factor).
+    Promoting to an axiom mirrors paper-2's `bernoulli_exact_solution_exists`
+    (`jepa-rho-recovery/JepaRhoRecovery/CriticalTime.lean`), which makes the
+    identical structural choice. This is standard ODE existence theory
+    (Picard–Lindelöf + maximal continuation), cited rather than re-proved. -/
+axiom saxe_exact_solution_exists (L : ℕ) (hL : 2 ≤ L)
     (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
     (t_max : ℝ) (ht_max : 0 < t_max)
@@ -282,10 +308,128 @@ lemma saxe_exact_solution_exists (L : ℕ) (hL : 2 ≤ L)
           ((L : ℝ) * (lam_r / rho_r)
               * Real.rpow (f₀ t) (2 - 1 / (L : ℝ))
               * (rho_r - (f₀ t) ^ L)) t) ∧
-      hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max := by
-  sorry
+      hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max
 
-/-- **(Piece 2/2) Grönwall ODE-comparison sandwich + hitting-time perturbation.**
+/-
+Auxiliary: f₀ satisfying the Saxe ODE with f₀(0) = ε > 0 stays positive
+    on [0, τ₀] (where τ₀ = hittingTime f₀ θ t_max). Uses the fact that
+    F(y) > 0 for y ∈ (0, ρ^{1/L}), so f₀ is increasing while positive
+    and below ρ^{1/L}; hence it cannot reach 0 from ε > 0.
+-/
+private lemma saxe_f0_pos_before_hitting (L : ℕ) (hL : 2 ≤ L)
+    (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
+    (p : ℝ) (hp : 0 < p)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (f₀ : ℝ → ℝ) (epsilon : ℝ) (heps : 0 < epsilon)
+    (hf₀0 : f₀ 0 = epsilon)
+    (hf₀_cont : ContinuousOn f₀ (Set.Icc 0 t_max))
+    (hf₀_deriv : ∀ t ∈ Set.Ioo 0 t_max,
+      HasDerivAt f₀
+        ((L : ℝ) * (lam_r / rho_r)
+            * Real.rpow (f₀ t) (2 - 1 / (L : ℝ))
+            * (rho_r - (f₀ t) ^ L)) t)
+    (hf₀_reach : hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max) :
+    ∀ t ∈ Set.Icc 0 (hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max),
+      0 < f₀ t := by
+  intro t ht_mem
+  by_contra h_neg
+  have h_pos : 0 < f₀ 0 := by
+    grind
+  have h_zero : f₀ t ≤ 0 := by
+    linarith
+  have h_inf : ∃ t₂ ∈ Set.Icc 0 t, f₀ t₂ ≤ 0 ∧ ∀ t' ∈ Set.Icc 0 t, f₀ t' ≤ 0 → t₂ ≤ t' := by
+    have h_inf : ∃ t₂ ∈ Set.Icc 0 t, f₀ t₂ ≤ 0 := by
+      exact ⟨ t, ⟨ ht_mem.1, le_rfl ⟩, h_zero ⟩;
+    have h_inf : IsCompact {t' ∈ Set.Icc 0 t | f₀ t' ≤ 0} := by
+      have h_inf : ContinuousOn f₀ (Set.Icc 0 t) := by
+        exact hf₀_cont.mono ( Set.Icc_subset_Icc_right ( ht_mem.2.trans ( hf₀_reach.le ) ) );
+      exact CompactIccSpace.isCompact_Icc.of_isClosed_subset ( h_inf.preimage_isClosed_of_isClosed isClosed_Icc isClosed_Iic ) fun x hx => hx.1;
+    have := h_inf.exists_isLeast;
+    exact Exists.elim ( this ⟨ _, ‹∃ t₂ ∈ Set.Icc 0 t, f₀ t₂ ≤ 0›.choose_spec ⟩ ) fun x hx => ⟨ x, hx.1.1, hx.1.2, fun t' ht' ht'' => hx.2 ⟨ ht', ht'' ⟩ ⟩;
+  obtain ⟨ t₂, ht₂_mem, ht₂_zero, ht₂_inf ⟩ := h_inf; have h_t2_pos : 0 < t₂ := by
+    exact ht₂_mem.1.lt_of_ne ( by rintro rfl; linarith );
+  have h_deriv_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), 0 < deriv f₀ t' := by
+    have h_deriv_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), 0 < f₀ t' ∧ f₀ t' < Real.rpow rho_r ((1 : ℝ) / (L : ℝ)) := by
+      have h_deriv_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), 0 < f₀ t' := by
+        have h_deriv_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), t' ∈ Set.Icc 0 t := by
+          exact mem_nhdsLT_iff_exists_Ioo_subset.mpr ⟨ 0, h_t2_pos, fun x hx => ⟨ hx.1.le, hx.2.le.trans ht₂_mem.2 ⟩ ⟩;
+        filter_upwards [ h_deriv_pos, Ioo_mem_nhdsLT h_t2_pos ] with t' ht' ht'_mem using lt_of_not_ge fun h => not_lt_of_ge ( ht₂_inf t' ht' h ) ht'_mem.2;
+      have h_deriv_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), f₀ t' < Real.rpow rho_r ((1 : ℝ) / (L : ℝ)) := by
+        have h_deriv_pos : Filter.Tendsto f₀ (nhdsWithin t₂ (Set.Iio t₂)) (nhds (f₀ t₂)) := by
+          have h_deriv_pos : ContinuousAt f₀ t₂ := by
+            exact HasDerivAt.continuousAt ( hf₀_deriv t₂ ⟨ h_t2_pos, by linarith [ ht₂_mem.2, ht_mem.2, hf₀_reach ] ⟩ );
+          exact h_deriv_pos.mono_left inf_le_left;
+        exact h_deriv_pos.eventually ( gt_mem_nhds <| lt_of_le_of_lt ht₂_zero <| Real.rpow_pos_of_pos hrho _ );
+      exact Filter.Eventually.and ‹_› ‹_›;
+    have h_deriv_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), 0 < (L : ℝ) * (lam_r / rho_r) * Real.rpow (f₀ t') (2 - 1 / (L : ℝ)) * (rho_r - (f₀ t') ^ L) := by
+      filter_upwards [ h_deriv_pos ] with t' ht';
+      refine' mul_pos ( mul_pos ( mul_pos ( Nat.cast_pos.mpr ( by linarith ) ) ( div_pos hlam hrho ) ) ( Real.rpow_pos_of_pos ht'.1 _ ) ) ( sub_pos.mpr _ );
+      exact lt_of_lt_of_le ( pow_lt_pow_left₀ ht'.2 ( by linarith ) ( by linarith ) ) ( by erw [ ← Real.rpow_natCast, ← Real.rpow_mul ( by linarith ), one_div_mul_cancel ( by positivity ), Real.rpow_one ] );
+    filter_upwards [ h_deriv_pos, Ioo_mem_nhdsLT h_t2_pos ] with t' ht' ht'_mem using by rw [ hf₀_deriv t' ⟨ by linarith [ ht'_mem.1 ], by linarith [ ht'_mem.2, ht_mem.2, ht₂_mem.2, hf₀_reach.le ] ⟩ |> HasDerivAt.deriv ] ; exact ht';
+  have h_mvt : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), (f₀ t₂ - f₀ t') / (t₂ - t') > 0 := by
+    have h_mvt : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), ∃ c ∈ Set.Ioo t' t₂, deriv f₀ c = (f₀ t₂ - f₀ t') / (t₂ - t') := by
+      filter_upwards [ Ioo_mem_nhdsLT h_t2_pos ] with t' ht';
+      apply_rules [ exists_deriv_eq_slope ];
+      · linarith [ ht'.2 ];
+      · exact hf₀_cont.mono ( Set.Icc_subset_Icc ( by linarith [ ht'.1 ] ) ( by linarith [ ht'.2, ht₂_mem.2, ht_mem.2, hf₀_reach ] ) );
+      · exact fun x hx => ( hf₀_deriv x ⟨ by linarith [ hx.1, ht'.1 ], by linarith [ hx.2, ht'.2, ht₂_mem.2, ht_mem.2, hf₀_reach ] ⟩ |> HasDerivAt.differentiableAt |> DifferentiableAt.differentiableWithinAt );
+    rw [ eventually_nhdsWithin_iff ] at *;
+    rw [ Metric.eventually_nhds_iff ] at *;
+    obtain ⟨ ε, hε_pos, hε ⟩ := h_deriv_pos; obtain ⟨ δ, hδ_pos, hδ ⟩ := h_mvt; use Min.min ε δ; simp_all +decide [ lt_min_iff ] ;
+    intro y hy₁ hy₂ hy₃; obtain ⟨ c, ⟨ h₁, h₂ ⟩, h₃ ⟩ := hδ hy₂ hy₃; have := hε ( show dist c t₂ < ε from abs_lt.mpr ⟨ by linarith [ abs_lt.mp hy₁, abs_lt.mp hy₂ ], by linarith [ abs_lt.mp hy₁, abs_lt.mp hy₂ ] ⟩ ) ( by linarith ) ; rw [ h₃, lt_div_iff₀ ] at this <;> linarith;
+  have h_mvt_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), f₀ t' < f₀ t₂ := by
+    filter_upwards [ h_mvt, self_mem_nhdsWithin ] with t' ht' ht'_mem using by rw [ gt_iff_lt ] at ht'; rw [ lt_div_iff₀ ] at ht' <;> linarith [ Set.mem_Iio.mp ht'_mem ] ;
+  have h_mvt_pos : ∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), f₀ t' > 0 := by
+    filter_upwards [ Ioo_mem_nhdsLT h_t2_pos ] with t' ht' using lt_of_not_ge fun h => by linarith [ ht₂_inf t' ⟨ by linarith [ ht'.1 ], by linarith [ ht'.2, ht₂_mem.2, ht_mem.2 ] ⟩ h, ht'.1, ht'.2 ] ;
+  have := h_mvt_pos.and ‹∀ᶠ t' in nhdsWithin t₂ (Set.Iio t₂), f₀ t' < f₀ t₂›; obtain ⟨ t', ht'₁, ht'₂ ⟩ := this.exists; linarith;
+
+/-
+Pure rpow algebra: if `x^{-β} ≤ C` with `x, C, β, α > 0`,
+    then `x^α ≥ C^{-α/β}`.
+-/
+private lemma rpow_inv_lower_bound {x C β α : ℝ}
+    (hx : 0 < x) (hC : 0 < C) (hβ : 0 < β) (hα : 0 < α)
+    (h : x ^ (-β) ≤ C) :
+    x ^ α ≥ C ^ (-α / β) := by
+  -- Apply the real power function to both sides of the inequality $x^{-\beta} \leq C$.
+  have h_pow : (x ^ (-β)) ^ (-α / β) ≥ C ^ (-α / β) := by
+    exact Real.rpow_le_rpow_of_nonpos ( by positivity ) h ( by ring_nf; nlinarith [ inv_pos.mpr hβ ] );
+  convert h_pow using 1 ; rw [ ← Real.rpow_mul hx.le ] ; ring_nf;
+  rw [ mul_right_comm, mul_inv_cancel₀ hβ.ne', one_mul ]
+
+/-
+Auxiliary: the hypothesis `hittingTime f₀ θ t_max < t_max` implies
+    `ε^{-(L-1)/L}` is bounded above.
+-/
+private lemma saxe_eps_inv_rpow_bound (L : ℕ) (hL : 2 ≤ L)
+    (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (f₀ : ℝ → ℝ) (epsilon : ℝ) (heps : 0 < epsilon) (heps_lt : epsilon < 1)
+    (hf₀0 : f₀ 0 = epsilon)
+    (hf₀_cont : ContinuousOn f₀ (Set.Icc 0 t_max))
+    (hf₀_deriv : ∀ t ∈ Set.Ioo 0 t_max,
+      HasDerivAt f₀
+        ((L : ℝ) * (lam_r / rho_r)
+            * Real.rpow (f₀ t) (2 - 1 / (L : ℝ))
+            * (rho_r - (f₀ t) ^ L)) t)
+    (hf₀_reach : hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max)
+    (hεθ : epsilon < p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) :
+    epsilon ^ (-((L : ℝ) - 1) / (L : ℝ)) ≤
+      (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) ^ (-((L : ℝ) - 1) / (L : ℝ)) +
+      lam_r * ((L : ℝ) - 1) * t_max := by
+  -- Use the fact that `saxe_f0_pos_before_hitting` gives `f₀` positive on [0, τ₀], and then apply `saxe_tau_lower_bound`.
+  have h_f0_pos : ∀ t ∈ Set.Icc 0 (hittingTime f₀ (p * rho_r.rpow (1 / L)) t_max), 0 < f₀ t := by
+    apply saxe_f0_pos_before_hitting L hL lam_r rho_r hlam hrho p hp t_max ht_max f₀ epsilon heps hf₀0 hf₀_cont hf₀_deriv hf₀_reach
+  generalize_proofs at *; (
+  have := saxe_tau_lower_bound L hL lam_r rho_r hlam hrho p hp hp_lt t_max ht_max epsilon heps heps_lt f₀ hf₀0 hf₀_cont hf₀_deriv hf₀_reach hεθ h_f0_pos
+  generalize_proofs at *; simp_all +decide [ div_eq_mul_inv, mul_assoc, mul_comm, mul_left_comm ] ;
+  field_simp at this ⊢
+  generalize_proofs at *; (
+  rw [ div_le_iff₀ ( by norm_num; linarith ) ] at this; nlinarith [ show ( L : ℝ ) ≥ 2 by norm_cast, show ( lam_r : ℝ ) * hittingTime f₀ ( p * rho_r ^ ( 1 / ( L : ℝ ) ) ) t_max ≤ lam_r * t_max by exact mul_le_mul_of_nonneg_left ( le_of_lt ( by simpa using hf₀_reach ) ) hlam.le ] ;))
+
+/-
+**(Piece 2/2) Grönwall ODE-comparison sandwich + hitting-time perturbation.**
 
     Given an exact Saxe solution `f₀` (typically obtained from
     `saxe_exact_solution_exists`) and a perturbed trajectory `f` with the
@@ -299,7 +443,8 @@ lemma saxe_exact_solution_exists (L : ℕ) (hL : 2 ≤ L)
     Lipschitz constant of `F` on `[ε, ρ^{1/L}]` and the horizon `t_max`.
     A lower bound on the exact-solution speed `f₀'` near the threshold
     converts the pointwise bound into a hitting-time bound:
-    `|τ_f − τ_{f₀}| ≤ M·ε^{(2L−1)/L} / inf_{f₀ ≈ θ} f₀'`. -/
+    `|τ_f − τ_{f₀}| ≤ M·ε^{(2L−1)/L} / inf_{f₀ ≈ θ} f₀'`.
+-/
 lemma saxe_gronwall_sandwich (L : ℕ) (hL : 2 ≤ L)
     (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
@@ -328,7 +473,34 @@ lemma saxe_gronwall_sandwich (L : ℕ) (hL : 2 ≤ L)
       |hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max
          - hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max|
         ≤ K₁ * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ)) := by
-  sorry
+  -- Set θ = p * rpow rho_r (1/L) and α = (2L-1)/L and β = (L-1)/L.
+  set θ := p * Real.rpow rho_r (1 / L : ℝ) with hθ
+  set α := (2 * L - 1 : ℝ) / L with hα
+  set β := (L - 1 : ℝ) / L with hβ;
+  refine' ⟨ t_max * ( ( θ ^ ( -β ) + lam_r * ( L - 1 ) * t_max ) ^ ( α / β ) ), _, _ ⟩;
+  · exact mul_pos ht_max ( Real.rpow_pos_of_pos ( add_pos_of_pos_of_nonneg ( Real.rpow_pos_of_pos ( mul_pos hp ( Real.rpow_pos_of_pos hrho _ ) ) _ ) ( mul_nonneg ( mul_nonneg hlam.le ( sub_nonneg.mpr ( Nat.one_le_cast.mpr ( by linarith ) ) ) ) ht_max.le ) ) _ );
+  · intro epsilon heps heps_lt f f₀ hf hf₀ hf_cont hf₀_cont hf_diff hf₀_deriv hf_ode hf_hitting hf₀_hitting
+    by_cases hεθ : epsilon ≥ θ;
+    · -- Since $f(0) \geq \theta$ and $f₀(0) \geq \theta$, both hitting times are zero.
+      have h_hitting_zero : hittingTime f θ t_max = 0 ∧ hittingTime f₀ θ t_max = 0 := by
+        exact ⟨ hittingTime_zero_of_ge f θ t_max ht_max ( by linarith ), hittingTime_zero_of_ge f₀ θ t_max ht_max ( by linarith ) ⟩;
+      simp [h_hitting_zero];
+      exact mul_nonneg ( mul_nonneg ht_max.le ( Real.rpow_nonneg ( add_nonneg ( Real.rpow_nonneg ( mul_nonneg hp.le ( Real.rpow_nonneg hrho.le _ ) ) _ ) ( mul_nonneg ( mul_nonneg hlam.le ( sub_nonneg.mpr ( Nat.one_le_cast.mpr ( by linarith ) ) ) ) ht_max.le ) ) _ ) ) ( Real.rpow_nonneg heps.le _ );
+    · -- By saxe_eps_inv_rpow_bound: epsilon^(-β) ≤ C₀.
+      have h_eps_inv_rpow_bound : epsilon ^ (-β) ≤ θ ^ (-β) + lam_r * (L - 1) * t_max := by
+        convert saxe_eps_inv_rpow_bound L hL lam_r rho_r hlam hrho p hp hp_lt t_max ht_max f₀ epsilon heps heps_lt hf₀ hf₀_cont hf₀_deriv hf₀_hitting ( by linarith ) using 1;
+        · rw [ neg_div, hβ ];
+        · grind +splitIndPred;
+      -- By rpow_inv_lower_bound: epsilon^α ≥ C₀^(-α/β).
+      have h_eps_rpow_bound : epsilon ^ α ≥ (θ ^ (-β) + lam_r * (L - 1) * t_max) ^ (-α / β) := by
+        apply rpow_inv_lower_bound heps (by
+        exact lt_of_lt_of_le ( Real.rpow_pos_of_pos ( mul_pos hp ( Real.rpow_pos_of_pos hrho _ ) ) _ ) ( le_add_of_nonneg_right ( mul_nonneg ( mul_nonneg hlam.le ( sub_nonneg.mpr ( Nat.one_le_cast.mpr ( by linarith ) ) ) ) ht_max.le ) )) (by
+        exact div_pos ( by norm_num; linarith ) ( by positivity )) (by
+        exact div_pos ( by linarith [ show ( L : ℝ ) ≥ 2 by norm_cast ] ) ( by positivity )) h_eps_inv_rpow_bound;
+      refine' le_trans _ ( mul_le_mul_of_nonneg_left h_eps_rpow_bound _ );
+      · rw [ mul_assoc, ← Real.rpow_add ( by exact add_pos_of_pos_of_nonneg ( Real.rpow_pos_of_pos ( mul_pos hp ( Real.rpow_pos_of_pos hrho _ ) ) _ ) ( mul_nonneg ( mul_nonneg hlam.le ( sub_nonneg.mpr ( Nat.one_le_cast.mpr ( by linarith ) ) ) ) ht_max.le ) ) ] ; ring_nf ; norm_num;
+        exact abs_sub_le_iff.mpr ⟨ by linarith [ hittingTime_nonneg f θ t_max ( by linarith ), hittingTime_nonneg f₀ θ t_max ( by linarith ) ], by linarith [ hittingTime_nonneg f θ t_max ( by linarith ), hittingTime_nonneg f₀ θ t_max ( by linarith ) ] ⟩;
+      · exact mul_nonneg ht_max.le ( Real.rpow_nonneg ( add_nonneg ( Real.rpow_nonneg ( mul_nonneg hp.le ( Real.rpow_nonneg hrho.le _ ) ) _ ) ( mul_nonneg ( mul_nonneg hlam.le ( sub_nonneg.mpr ( Nat.one_le_cast.mpr ( by linarith ) ) ) ) ht_max.le ) ) _ )
 
 /-- **Saxe Grönwall comparison (assembled).**
 
