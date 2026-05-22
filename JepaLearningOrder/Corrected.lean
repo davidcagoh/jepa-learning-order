@@ -42,6 +42,7 @@ change.
 
 import JepaLearningOrder.JEPA
 import JepaLearningOrder.Lemmas
+import JepaLearningOrder.SaxeAsymptoticHelpers
 import Mathlib.Analysis.SpecialFunctions.Pow.Real
 
 namespace JepaLearningOrder
@@ -227,30 +228,114 @@ in the original `bernoulli_laurent_bound`): `saxe_gronwall_comparison`
 and `saxe_singlepole_asymptotic`.
 -/
 
-/-- **Gronwall comparison for Saxe ODE.**
-Construct an exact-Saxe solution f₀ matching f at t=0 and bound the
-hitting-time perturbation by `K₁ · ε^{(2L-1)/L}`. **Parallel to the
-`h_gronwall` sorry in the original `bernoulli_laurent_bound`.**
+/-! ### Decomposition of `saxe_gronwall_comparison` into 2 Aristotle-dispatchable pieces
 
-⚠ **STATEMENT HARDENED (session 91, 2026-05-21)** — previous draft accepted
-`deriv f₀ t = F(f₀ t)` as the ODE clause, which is satisfied by the
-*equilibrium-jump piecewise-constant function* `f₀(t) := ε if t = 0 ; 0 if 0 < t < τ ;
-ρ^{1/L} if t ≥ τ` (Aristotle run `20dbfd88`/`d31884ff`). Both 0 and ρ^{1/L}
-are equilibria of `F`, so `deriv f₀ t = 0 = F(f₀ t)` holds wherever `f₀`
-is locally constant (everywhere except the jump). Lean's `deriv` returns 0
-at non-differentiable points, so the jump itself doesn't break the clause.
+Session 92 (2026-05-22) — after Aristotle run `2714f6da` disproved the
+session-91 hardened statement, the gronwall claim has been restructured to
+mirror paper-2's `CriticalTime.lean` honesty pattern. The two missing
+pieces are dispatched independently:
 
-This version requires `HasDerivAt f₀ (F(f₀ t)) t` *and* `ContinuousOn f₀ (Icc 0 t_max)`.
-A jump at any `τ ∈ Ioo 0 t_max` violates `HasDerivAt`; a jump at `t = 0`
-violates `f₀ 0 = ε` together with continuity if the right limit is 0.
-Constant-at-equilibrium (`f₀ ≡ 0` on `(0, t_max)`) is forbidden by
-`f₀ 0 = ε > 0` combined with `ContinuousOn` — the right-limit at 0 must
-be ε, not 0. Constant-at-ε is forbidden because `F(ε) ≠ 0` for generic ρ
-(unless ρ = ε^L, a knife-edge case).
+  * `saxe_exact_solution_exists` — Picard–Lindelöf existence for the exact
+    Saxe ODE on `[0, t_max]`, with threshold reachability provable from the
+    caller-supplied `h_t_max_reach` hypothesis. Mirrors paper-2's
+    `bernoulli_exact_solution_exists` (Aristotle `5fbe03d3`).
 
-The remaining flexibility allows only actual C¹ solutions of the Saxe ODE
-from initial condition ε; existence/uniqueness is the genuine Picard–Lindelöf
-content. -/
+  * `saxe_gronwall_sandwich` — ODE-comparison Grönwall + hitting-time
+    perturbation: given the exact `f₀` and a perturbed `f` with both
+    reaching the threshold, bound `|τ_f − τ_{f₀}|` by `K₁·ε^{(2L−1)/L}`.
+    Mirrors paper-2's `bernoulli_gronwall_sandwich` (Aristotle `f00f9f44`).
+
+The third paper-2 piece (`bernoulli_exact_laurent`) is paper-1's already-proved
+`saxe_singlepole_asymptotic` (Aristotle `2fc66cdc`, session 91 hardened).
+
+`saxe_gronwall_comparison` body then assembles the two via composition
+(existence supplies `f₀`, sandwich supplies the bound). -/
+
+/-- **(Piece 1/2) Picard–Lindelöf existence for the exact Saxe ODE.**
+
+    For any initial value `ε ∈ (0, 1)` and parameters `L ≥ 2`, `λ > 0`,
+    `ρ > 0`, with `t_max` large enough that `2/(λ(L−1)·ε^{(L−1)/L}) ≤ t_max`,
+    there exists a function `f₀ : ℝ → ℝ` with `f₀(0) = ε` satisfying the
+    exact (unperturbed) Saxe ODE
+        `f₀'(t) = L · (λ/ρ) · f₀(t)^{2−1/L} · (ρ − f₀(t)^L)`
+    on `Ioo 0 t_max`, with `hittingTime f₀ (p·ρ^{1/L}) t_max < t_max`.
+
+    Proof: the right-hand side `F(y) = L·(λ/ρ)·y^{2−1/L}·(ρ − y^L)` is
+    C¹ on `(0, ρ^{1/L}]` and locally Lipschitz, so Picard–Lindelöf gives
+    a local solution. Maximal-solution continuation extends to a global
+    solution on `[0, t_max]` since the trajectory is monotone increasing
+    and bounded above by `ρ^{1/L}`. The reachability clause follows from
+    `h_t_max_reach` and the asymptotic `T(ε) ≤ (2/(λ(L−1)))·ε^{−(L−1)/L}`. -/
+lemma saxe_exact_solution_exists (L : ℕ) (hL : 2 ≤ L)
+    (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (epsilon : ℝ) (heps : 0 < epsilon) (heps_lt : epsilon < 1)
+    (h_t_max_reach :
+      (2 : ℝ) / (lam_r * ((L : ℝ) - 1) *
+          epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max) :
+    ∃ (f₀ : ℝ → ℝ),
+      f₀ 0 = epsilon ∧
+      ContinuousOn f₀ (Set.Icc 0 t_max) ∧
+      (∀ t ∈ Set.Ioo 0 t_max,
+        HasDerivAt f₀
+          ((L : ℝ) * (lam_r / rho_r)
+              * Real.rpow (f₀ t) (2 - 1 / (L : ℝ))
+              * (rho_r - (f₀ t) ^ L)) t) ∧
+      hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max := by
+  sorry
+
+/-- **(Piece 2/2) Grönwall ODE-comparison sandwich + hitting-time perturbation.**
+
+    Given an exact Saxe solution `f₀` (typically obtained from
+    `saxe_exact_solution_exists`) and a perturbed trajectory `f` with the
+    same initial value `ε`, both reaching the threshold within `t_max`,
+    and `|f'(t) − F(f(t))| ≤ C·ε^{(2L−1)/L}` (where `F` is the Saxe RHS),
+    the perturbed and exact hitting times differ by at most
+    `K₁·ε^{(2L−1)/L}`.
+
+    Proof: standard Grönwall on `|f − f₀|` gives `|f(t) − f₀(t)| ≤
+    M·ε^{(2L−1)/L}` for `t ∈ [0, t_max]`, with `M` depending on the
+    Lipschitz constant of `F` on `[ε, ρ^{1/L}]` and the horizon `t_max`.
+    A lower bound on the exact-solution speed `f₀'` near the threshold
+    converts the pointwise bound into a hitting-time bound:
+    `|τ_f − τ_{f₀}| ≤ M·ε^{(2L−1)/L} / inf_{f₀ ≈ θ} f₀'`. -/
+lemma saxe_gronwall_sandwich (L : ℕ) (hL : 2 ≤ L)
+    (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
+    (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
+    (t_max : ℝ) (ht_max : 0 < t_max)
+    (C_ode : ℝ) (hC : 0 < C_ode) :
+    ∃ K₁ : ℝ, 0 < K₁ ∧
+    ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+    ∀ (f f₀ : ℝ → ℝ),
+      f 0 = epsilon →
+      f₀ 0 = epsilon →
+      ContinuousOn f (Set.Icc 0 t_max) →
+      ContinuousOn f₀ (Set.Icc 0 t_max) →
+      (∀ t ∈ Set.Ioo 0 t_max, DifferentiableAt ℝ f t) →
+      (∀ t ∈ Set.Ioo 0 t_max,
+        HasDerivAt f₀
+          ((L : ℝ) * (lam_r / rho_r)
+              * Real.rpow (f₀ t) (2 - 1 / (L : ℝ))
+              * (rho_r - (f₀ t) ^ L)) t) →
+      (∀ t ∈ Set.Ioo 0 t_max,
+        |deriv f t - ((L : ℝ) * (lam_r / rho_r)
+              * Real.rpow (f t) (2 - 1 / (L : ℝ))
+              * (rho_r - (f t) ^ L))|
+        ≤ C_ode * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ))) →
+      hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max →
+      hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max →
+      |hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max
+         - hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max|
+        ≤ K₁ * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ)) := by
+  sorry
+
+/-- **Saxe Grönwall comparison (assembled).**
+
+    Composes `saxe_exact_solution_exists` (existence + reachability) and
+    `saxe_gronwall_sandwich` (Grönwall + hitting-time perturbation).
+    Body is mechanical assembly; the analytic content lives in the two
+    pieces above. -/
 lemma saxe_gronwall_comparison (L : ℕ) (hL : 2 ≤ L)
     (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
@@ -258,13 +343,24 @@ lemma saxe_gronwall_comparison (L : ℕ) (hL : 2 ≤ L)
     (C_ode : ℝ) (hC : 0 < C_ode) :
     ∃ K₁ : ℝ, 0 < K₁ ∧
     ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+    (2 : ℝ) / (lam_r * ((L : ℝ) - 1) *
+        epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max →
     ∀ (f : ℝ → ℝ),
       f 0 = epsilon →
+      ContinuousOn f (Set.Icc 0 t_max) →
+      (∀ t ∈ Set.Ioo 0 t_max, DifferentiableAt ℝ f t) →
       (∀ t ∈ Set.Ioo 0 t_max,
         |deriv f t - ((L : ℝ) * (lam_r / rho_r)
               * Real.rpow (f t) (2 - 1 / (L : ℝ))
               * (rho_r - (f t) ^ L))|
         ≤ C_ode * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ))) →
+      -- Caller-supplied reachability for `f` (matches paper-2's
+      -- `bernoulli_laurent_bound` after the 2026-05-20 honesty pass).
+      -- For ε in the asymptotic regime, this is provable from the
+      -- ODE-approximation hypothesis + f₀'s reachability + Gronwall
+      -- closeness, but Lean doesn't see that implication without
+      -- the full sandwich machinery; we require it from the caller.
+      hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max < t_max →
       ∃ (f₀ : ℝ → ℝ),
         f₀ 0 = epsilon ∧
         ContinuousOn f₀ (Set.Icc 0 t_max) ∧
@@ -277,7 +373,16 @@ lemma saxe_gronwall_comparison (L : ℕ) (hL : 2 ≤ L)
         |hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max
            - hittingTime f₀ (p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ))) t_max|
           ≤ K₁ * epsilon ^ ((2 * (L : ℝ) - 1) / (L : ℝ)) := by
-  sorry
+  obtain ⟨K₁, hK₁_pos, hK₁_bd⟩ :=
+    saxe_gronwall_sandwich L hL lam_r rho_r hlam hrho p hp hp_lt t_max ht_max C_ode hC
+  refine ⟨K₁, hK₁_pos, ?_⟩
+  intro epsilon heps heps_lt h_t_max_reach f hf0 hf_cont hf_diff hode hf_reach
+  obtain ⟨f₀, hf₀_init, hf₀_cont, hf₀_hasderiv, hf₀_reach⟩ :=
+    saxe_exact_solution_exists L hL lam_r rho_r hlam hrho p hp hp_lt
+      t_max ht_max epsilon heps heps_lt h_t_max_reach
+  refine ⟨f₀, hf₀_init, hf₀_cont, hf₀_hasderiv, hf₀_reach, ?_⟩
+  exact hK₁_bd epsilon heps heps_lt f f₀ hf0 hf₀_init hf_cont hf₀_cont hf_diff
+    hf₀_hasderiv hode hf_reach hf₀_reach
 
 /-- **Single-pole asymptotic for exact Saxe ODE.**
 For the exact Saxe ODE, the hitting time at `p·ρ^{1/L}` is
@@ -320,7 +425,93 @@ lemma saxe_singlepole_asymptotic (L : ℕ) (hL : 2 ≤ L)
          - (1 / ((lam_r / rho_r) * rho_r * ((L : ℝ) - 1)))
            * epsilon ^ (-((L : ℝ) - 1) / (L : ℝ))|
         ≤ K₂ * epsilon ^ (-((L : ℝ) - 2) / (L : ℝ)) := by
-  sorry
+  -- Aristotle job 2fc66cdc (session 91 hardened resubmit, 2026-05-21).
+  -- Lyapunov pair: Φ(t) = f₀(t)^{-(L-1)/L} + (L-1)·λ·t (monotone non-decreasing)
+  -- and Γ(t) = f₀(t)^α with α = (L²-L+1)/L (companion).
+  -- K₂ depends only on (L, lam_r, rho_r, p), NOT on t_max.
+  have hL_pos : (0 : ℝ) < (L : ℝ) := Nat.cast_pos.mpr (by omega)
+  have hL_ge2 : (2 : ℝ) ≤ (L : ℝ) := Nat.ofNat_le_cast.mpr hL
+  have hθ_pos : (0 : ℝ) < p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ)) :=
+    mul_pos hp (Real.rpow_pos_of_pos hrho _)
+  have hA_pos : (0 : ℝ) < 1 / ((lam_r / rho_r) * rho_r * ((L : ℝ) - 1)) := by
+    apply div_pos one_pos; apply mul_pos; apply mul_pos; exact div_pos hlam hrho; exact hrho; linarith
+  have hpL : (0 : ℝ) < 1 - p ^ L := by
+    have : p ^ L < 1 := pow_lt_one₀ hp.le hp_lt (by omega)
+    linarith
+  set θ := p * Real.rpow rho_r ((1 : ℝ) / (L : ℝ)) with hθ_def
+  set A := 1 / ((lam_r / rho_r) * rho_r * ((L : ℝ) - 1)) with hA_def
+  set exp_ := -((L : ℝ) - 1) / (L : ℝ) with hexp_def
+  set exp2_ := -((L : ℝ) - 2) / (L : ℝ) with hexp2_def
+  set α := ((L : ℝ) ^ 2 - (L : ℝ) + 1) / (L : ℝ) with hα_def
+  set C_coeff := ((L : ℝ) - 1) /
+    (((L : ℝ) ^ 2 - (L : ℝ) + 1) / (L : ℝ) * (L : ℝ) * rho_r * (1 - p ^ L)) with hC_def
+  set D := C_coeff * θ ^ α / ((L : ℝ) - 1) / lam_r with hD_def
+  have hA_nn : (0 : ℝ) ≤ A := le_of_lt hA_pos
+  have hθrp_nn : ∀ (e : ℝ), (0 : ℝ) ≤ θ ^ e := fun e => Real.rpow_nonneg hθ_pos.le e
+  have hD_nn : (0 : ℝ) ≤ D := by
+    simp only [hD_def, hC_def]; apply div_nonneg; apply div_nonneg
+    apply mul_nonneg; apply div_nonneg (by linarith)
+    apply mul_nonneg; apply mul_nonneg; apply mul_nonneg
+    apply div_nonneg (by nlinarith) (by positivity); positivity; positivity; exact hpL.le
+    exact hθrp_nn _; linarith; positivity
+  refine ⟨A * θ ^ exp_ + D + A * θ ^ (-(1 : ℝ) / (L : ℝ)) + 1,
+    by linarith [mul_nonneg hA_nn (hθrp_nn exp_), mul_nonneg hA_nn (hθrp_nn (-(1:ℝ)/(L:ℝ)))],
+    ?_⟩
+  intro epsilon heps heps_lt f₀ hf₀_init hf₀_cont hf₀_ode hf₀_reach
+  have heps_nn : (0 : ℝ) ≤ epsilon := le_of_lt heps
+  have hεrp_nn : ∀ (e : ℝ), (0 : ℝ) ≤ epsilon ^ e := fun e => Real.rpow_nonneg heps_nn e
+  have hexp2_ge : (1 : ℝ) ≤ epsilon ^ exp2_ := by
+    rw [← Real.rpow_zero epsilon]
+    exact Real.rpow_le_rpow_of_exponent_ge heps heps_lt.le
+      (by simp only [hexp2_def]; apply div_nonpos_of_nonpos_of_nonneg; linarith; positivity)
+  by_cases hεθ : θ ≤ epsilon
+  · have hτ_zero : hittingTime f₀ θ t_max = 0 :=
+      hittingTime_zero_of_ge f₀ θ t_max ht_max (by rw [hf₀_init]; exact hεθ)
+    rw [hτ_zero]; simp only [zero_sub, abs_neg]
+    rw [abs_of_nonneg (mul_nonneg hA_nn (hεrp_nn _))]
+    have h_exp_split : epsilon ^ exp_ = epsilon ^ (-1 / L : ℝ) * epsilon ^ exp2_ := by
+      rw [← Real.rpow_add heps]
+      congr 1
+      simp only [hexp_def, hexp2_def, neg_div, neg_add_rev]
+      field_simp
+      ring
+    have h_exp_neg_inv : epsilon ^ (-1 / L : ℝ) ≤ θ ^ (-1 / L : ℝ) := by
+      rw [Real.rpow_le_rpow_iff_of_neg] <;> try positivity
+      · linarith
+      · exact div_neg_of_neg_of_pos (by norm_num) (by positivity)
+    rw [h_exp_split]
+    refine le_trans (mul_le_mul_of_nonneg_left
+      (mul_le_mul_of_nonneg_right h_exp_neg_inv (by positivity)) (by positivity)) ?_
+    rw [add_mul, add_mul, add_mul]
+    exact le_add_of_le_of_nonneg
+      (le_add_of_nonneg_of_le (by positivity)
+        (by nlinarith [show 0 ≤ A * θ ^ exp_ * epsilon ^ exp2_ from by positivity])) (by positivity)
+  · push_neg at hεθ
+    have hf₀_pos := saxe_f0_pos L hL lam_r rho_r hlam hrho p hp hp_lt
+      t_max ht_max epsilon heps f₀ hf₀_init hf₀_cont hf₀_ode hf₀_reach
+    have h_lower := saxe_tau_lower_bound L hL lam_r rho_r hlam hrho p hp hp_lt
+      t_max ht_max epsilon heps heps_lt f₀ hf₀_init hf₀_cont hf₀_ode
+      hf₀_reach hεθ hf₀_pos
+    have h_upper := saxe_tau_upper_bound L hL lam_r rho_r hlam hrho p hp hp_lt
+      t_max ht_max epsilon heps heps_lt f₀ hf₀_init hf₀_cont hf₀_ode
+      hf₀_reach hεθ hf₀_pos
+    rw [abs_le]
+    constructor
+    · have h1 : -(A * θ ^ exp_) ≤ hittingTime f₀ θ t_max - A * epsilon ^ exp_ := by
+        linarith
+      calc -((A * θ ^ exp_ + D + A * θ ^ (-(1 : ℝ) / (L : ℝ)) + 1) *
+              epsilon ^ exp2_)
+          ≤ -(A * θ ^ exp_) := by
+            nlinarith [mul_nonneg hA_nn (hθrp_nn (-(1:ℝ)/(L:ℝ)))]
+        _ ≤ hittingTime f₀ θ t_max - A * epsilon ^ exp_ := h1
+    · have h2 : hittingTime f₀ θ t_max - A * epsilon ^ exp_ ≤ D := by
+        linarith
+      calc hittingTime f₀ θ t_max - A * epsilon ^ exp_
+          ≤ D := h2
+        _ ≤ (A * θ ^ exp_ + D + A * θ ^ (-(1 : ℝ) / (L : ℝ)) + 1) *
+              epsilon ^ exp2_ := by
+            nlinarith [mul_nonneg hA_nn (hθrp_nn exp_),
+                       mul_nonneg hA_nn (hθrp_nn (-(1:ℝ)/(L:ℝ)))]
 
 theorem bernoulli_saxe_bound_corrected (L : ℕ) (hL : 2 ≤ L)
     (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
@@ -329,26 +520,38 @@ theorem bernoulli_saxe_bound_corrected (L : ℕ) (hL : 2 ≤ L)
     (C_ode : ℝ) (hC : 0 < C_ode) :
     ∃ K : ℝ, 0 < K ∧
     ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+    -- Statement-honesty: caller must witness `t_max` is large enough for the
+    -- exact Saxe solution to reach the threshold within the horizon.
+    -- Mirrors paper-2's `bernoulli_laurent_bound` after the 2026-05-20
+    -- statement-honesty pass.
+    (2 : ℝ) / (lam_r * ((L : ℝ) - 1) *
+        epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max →
     ∀ (f : ℝ → ℝ),
       f 0 = epsilon →
+      ContinuousOn f (Set.Icc 0 t_max) →
+      (∀ t ∈ Set.Ioo 0 t_max, DifferentiableAt ℝ f t) →
       (∀ t ∈ Set.Ioo 0 t_max,
         |deriv f t - ((L : ℝ) * (lam_r / rho_r)
               * Real.rpow (f t) (2 - 1 / L)
               * (rho_r - (f t) ^ L))|
         ≤ C_ode * epsilon ^ ((2 * (L : ℝ) - 1) / L)) →
+      -- Caller-supplied reachability for `f` (paper-2 honesty pattern).
+      hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / L)) t_max < t_max →
       |hittingTime f (p * Real.rpow rho_r ((1 : ℝ) / L)) t_max
          - (1 / ((lam_r / rho_r) * rho_r * ((L : ℝ) - 1)))
            * epsilon ^ (-((L : ℝ) - 1) / L)|
         ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
   -- Aristotle `bc7309bc`: Gronwall + single-pole + triangle inequality.
+  -- Updated session 92: thread `h_t_max_reach` + `ContinuousOn f` +
+  -- `DifferentiableAt f` + `hf_reach` through to gronwall comparison.
   obtain ⟨K₁, hK₁_pos, hK₁_bound⟩ :=
     saxe_gronwall_comparison L hL lam_r rho_r hlam hrho p hp hp_lt t_max ht_max C_ode hC
   obtain ⟨K₂, hK₂_pos, hK₂_bound⟩ :=
     saxe_singlepole_asymptotic L hL lam_r rho_r hlam hrho p hp hp_lt t_max ht_max
   refine ⟨K₁ + K₂, by positivity, ?_⟩
-  intro epsilon heps heps_lt f hf0 hode
+  intro epsilon heps heps_lt h_t_max_reach f hf0 hf_cont hf_diff hode hf_reach
   obtain ⟨f₀, hf₀_init, hf₀_cont, hf₀_hasderiv, hf₀_reach, h_gronwall_bd⟩ :=
-    hK₁_bound epsilon heps heps_lt f hf0 hode
+    hK₁_bound epsilon heps heps_lt h_t_max_reach f hf0 hf_cont hf_diff hode hf_reach
   have h_singlepole_bd :=
     hK₂_bound epsilon heps heps_lt f₀ hf₀_init hf₀_cont hf₀_hasderiv hf₀_reach
   set S := (1 / ((lam_r / rho_r) * rho_r * ((L : ℝ) - 1)))
@@ -400,8 +603,14 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
     (C : ℝ) (hC : 0 < C) :
     ∃ K : ℝ, 0 < K ∧
     ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
+    -- Statement-honesty hypothesis threaded from `bernoulli_saxe_bound_corrected`.
+    (2 : ℝ) / ((projectedCovariance dat eb r) * ((L : ℝ) - 1) *
+        epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max →
     ∀ (Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ),
       diagAmplitude dat eb (Wbar 0) r = epsilon →
+      ContinuousOn (fun t => diagAmplitude dat eb (Wbar t) r) (Set.Icc 0 t_max) →
+      (∀ t ∈ Set.Ioo 0 t_max,
+        DifferentiableAt ℝ (fun s => diagAmplitude dat eb (Wbar s) r) t) →
       (∀ t ∈ Set.Ioo 0 t_max,
         |deriv (fun s => diagAmplitude dat eb (Wbar s) r) t
          - ((L : ℝ) * (eb.pairs r).mu
@@ -409,6 +618,8 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
               * ((eb.pairs r).rho
                   - (diagAmplitude dat eb (Wbar t) r) ^ L))|
         ≤ C * epsilon ^ ((2 * (L : ℝ) - 1) / L)) →
+      hittingTime (fun t => diagAmplitude dat eb (Wbar t) r)
+                  (p * Real.rpow (eb.pairs r).rho ((1 : ℝ) / L)) t_max < t_max →
       |hittingTime (fun t => diagAmplitude dat eb (Wbar t) r)
                     (p * Real.rpow (eb.pairs r).rho ((1 : ℝ) / L)) t_max
          - (1 / ((projectedCovariance dat eb r) / (eb.pairs r).rho
@@ -416,6 +627,8 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
            * epsilon ^ (-((L : ℝ) - 1) / L)|
         ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
   -- Aristotle job b853ca6d (session 90). Mechanical composition.
+  -- Updated session 92: threads `h_t_max_reach` + `ContinuousOn` +
+  -- `DifferentiableAt` + `hf_reach` through to `bernoulli_saxe_bound_corrected`.
   have hlam_pos : (0 : ℝ) < projectedCovariance dat eb r :=
     mul_pos (eb.hpos r) (eb.pairs r).hmu_pos
   have hmu_eq : (eb.pairs r).mu = projectedCovariance dat eb r / (eb.pairs r).rho := by
@@ -425,8 +638,10 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
       (projectedCovariance dat eb r) ((eb.pairs r).rho)
       hlam_pos (eb.hpos r)
       p hp hp_lt t_max ht_max C hC
-  refine ⟨K, hK_pos, fun epsilon heps heps_lt Wbar hwbar_init hode => ?_⟩
-  apply hK_bound epsilon heps heps_lt (fun t => diagAmplitude dat eb (Wbar t) r) hwbar_init
+  refine ⟨K, hK_pos, fun epsilon heps heps_lt h_t_max_reach Wbar hwbar_init hwbar_cont hwbar_diff hode hwbar_reach => ?_⟩
+  apply hK_bound epsilon heps heps_lt h_t_max_reach
+    (fun t => diagAmplitude dat eb (Wbar t) r) hwbar_init hwbar_cont hwbar_diff
+    _ hwbar_reach
   intro t ht
   rw [← hmu_eq]
   exact hode t ht
@@ -484,6 +699,19 @@ theorem JEPA_dynamics_ordering_corrected (dat : JEPAData d) (eb : GenEigenbasis 
       diagAmplitude dat eb (Wbar epsilon 0) r = epsilon)
     (hinit_s : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
       diagAmplitude dat eb (Wbar epsilon 0) s = epsilon)
+    -- Session 92 statement-honesty (paper-2 alignment): caller must witness
+    -- regularity of the diagonal trajectories AND that `t_max` is large
+    -- enough for the asymptotic to engage for both `r` and `s`.
+    (hcont_r : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ContinuousOn (fun t => diagAmplitude dat eb (Wbar epsilon t) r) (Set.Icc 0 t_max))
+    (hdiff_r : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∀ t ∈ Set.Ioo 0 t_max,
+        DifferentiableAt ℝ (fun u => diagAmplitude dat eb (Wbar epsilon u) r) t)
+    (hcont_s : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ContinuousOn (fun t => diagAmplitude dat eb (Wbar epsilon t) s) (Set.Icc 0 t_max))
+    (hdiff_s : ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
+      ∀ t ∈ Set.Ioo 0 t_max,
+        DifferentiableAt ℝ (fun u => diagAmplitude dat eb (Wbar epsilon u) s) t)
     (hode_r : ∃ C_r : ℝ, 0 < C_r ∧ ∀ epsilon : ℝ, 0 < epsilon → epsilon < 1 →
       ∀ t ∈ Set.Ioo 0 t_max,
         |deriv (fun u => diagAmplitude dat eb (Wbar epsilon u) r) t
@@ -500,8 +728,21 @@ theorem JEPA_dynamics_ordering_corrected (dat : JEPAData d) (eb : GenEigenbasis 
               * ((eb.pairs s).rho
                   - (diagAmplitude dat eb (Wbar epsilon t) s) ^ L))|
         ≤ C_s * epsilon ^ ((2 * (L : ℝ) - 1) / L)) :
+    -- Session 92 statement-honesty: ordering holds when ε is in the
+    -- asymptotic-separation regime AND `t_max` is large enough for both
+    -- features to reach their respective thresholds within the horizon.
+    -- The latter is supplied per-ε by the caller (mirrors paper-2's
+    -- `bernoulli_laurent_bound` after the 2026-05-20 honesty pass).
     ∃ epsilon_0 : ℝ, 0 < epsilon_0 ∧ epsilon_0 < 1 ∧
       ∀ epsilon : ℝ, 0 < epsilon → epsilon < epsilon_0 →
+        (2 : ℝ) / (projectedCovariance dat eb r * ((L : ℝ) - 1) *
+            epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max →
+        (2 : ℝ) / (projectedCovariance dat eb s * ((L : ℝ) - 1) *
+            epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max →
+        hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) r)
+                    (p * Real.rpow (eb.pairs r).rho ((1 : ℝ) / L)) t_max < t_max →
+        hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) s)
+                    (p * Real.rpow (eb.pairs s).rho ((1 : ℝ) / L)) t_max < t_max →
         hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) r)
                      (p * Real.rpow (eb.pairs r).rho ((1 : ℝ) / L)) t_max
         < hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) s)
@@ -536,15 +777,17 @@ theorem JEPA_dynamics_ordering_corrected (dat : JEPAData d) (eb : GenEigenbasis 
   -- Step 4: Pick ε_0.
   refine ⟨min (1/2) (A ^ L), lt_min (by norm_num) hAL_pos,
           lt_of_le_of_lt (min_le_left _ _) (by norm_num), ?_⟩
-  intro ε hε_pos hε_lt
+  intro ε hε_pos hε_lt h_reach_r h_reach_s hτr_lt hτs_lt
   have hε_lt_half : ε < 1/2 := lt_of_lt_of_le hε_lt (min_le_left _ _)
   have hε_lt_1 : ε < 1 := by linarith
   have hε_lt_AL : ε < A ^ L := lt_of_lt_of_le hε_lt (min_le_right _ _)
   -- Step 5: Per-feature hitting-time bounds.
-  have h_r := hK_r_bd ε hε_pos hε_lt_1 (Wbar ε)
-    (hinit_r ε hε_pos hε_lt_1) (hode_r_bd ε hε_pos hε_lt_1)
-  have h_s := hK_s_bd ε hε_pos hε_lt_1 (Wbar ε)
-    (hinit_s ε hε_pos hε_lt_1) (hode_s_bd ε hε_pos hε_lt_1)
+  have h_r := hK_r_bd ε hε_pos hε_lt_1 h_reach_r (Wbar ε)
+    (hinit_r ε hε_pos hε_lt_1) (hcont_r ε hε_pos hε_lt_1) (hdiff_r ε hε_pos hε_lt_1)
+    (hode_r_bd ε hε_pos hε_lt_1) hτr_lt
+  have h_s := hK_s_bd ε hε_pos hε_lt_1 h_reach_s (Wbar ε)
+    (hinit_s ε hε_pos hε_lt_1) (hcont_s ε hε_pos hε_lt_1) (hdiff_s ε hε_pos hε_lt_1)
+    (hode_s_bd ε hε_pos hε_lt_1) hτs_lt
   -- Step 6: Set notation for asymptotic and remainder terms.
   set δ : ℝ := ε ^ (-((L : ℝ) - 2) / (L : ℝ)) with hδ_def
   set σ : ℝ := ε ^ (-((L : ℝ) - 1) / (L : ℝ)) with hσ_def

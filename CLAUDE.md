@@ -23,6 +23,7 @@ Part of the **Stochastic Proofs** workspace. Shared conventions and Aristotle wo
 | `JepaLearningOrder/PDLowerHelpers.lean` | Six helper lemmas for pd_lower_from_offDiag (Gershgorin, Frobenius norm, det factorization) |
 | `JepaLearningOrder/BootstrapLemmas.lean` | Three sub-lemmas + `bootstrap_consistency` + `uniform_pd_lower_from_compactness` (sessions 24–30) |
 | `JepaLearningOrder/MainTheorem.lean` | `JEPA_rho_ordering'` — main theorem with `hPD_lower` derived via compactness (session 30) |
+| `JepaLearningOrder/SaxeAsymptoticHelpers.lean` | 11 helpers for Saxe ODE asymptotic analysis (session 92): 8 `hittingTime` properties + 3 Lyapunov bounds. Used by `saxe_singlepole_asymptotic` in `Corrected.lean`. |
 | `my_theorems/paper.tex` | LaTeX paper — **authoritative spec** for what the theorem should say |
 
 ## Build commands
