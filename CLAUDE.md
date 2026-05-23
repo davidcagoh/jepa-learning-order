@@ -19,8 +19,9 @@ Part of the **Stochastic Proofs** workspace. Shared conventions and Aristotle wo
 | `JepaLearningOrder/JEPA.lean` | Re-export shim (session 95 split) — preserves `import JepaLearningOrder.JEPA` for external importers |
 | `JepaLearningOrder/JEPA/Core.lean` | Foundation types (Sections 1, 2): `JEPAData`, `GenEigenpair`/`GenEigenbasis`, `matFrobNorm`, amplitudes, `preconditioner` |
 | `JepaLearningOrder/JEPA/QuasiStatic.lean` | Sections 3-5: `gradient_projection`, `BalancedInit`, `quasiStaticDecoder`, `quasiStatic_approx` |
-| `JepaLearningOrder/JEPA/Bernoulli.lean` | Section 6: critical-time formula/ordering, `hittingTime`, Bernoulli partial-fractions / antideriv / closed-form, `jepa_critical_time_diag` |
-| `JepaLearningOrder/JEPA/DiagAmpODE.lean` | Section 6.5: `diagAmp_ODE` (DEPRECATED), `bernoulli_laurent_bound` (quarantined: 2 active sorries — `h_gronwall`, `h_laurent`), `actual_critical_time` |
+| `JepaLearningOrder/JEPA/Bernoulli.lean` | Hosts `hittingTime` definition only (used by `SaxeAsymptoticHelpers`). Inverted-form Bernoulli closed-form chain deleted session 98. |
+| `JepaLearningOrder/JEPA/DiagAmpODE.lean` | Section 5 stub. Inverted-form `diagAmp_ODE` / `bernoulli_laurent_bound` / `actual_critical_time` deleted session 98; Saxe-form replacements live in `JEPA/Saxe.lean`. |
+| `JepaLearningOrder/JEPA/Saxe.lean` | Saxe-form ODE chain (renamed from `Corrected.lean` session 98): `diagAmp_ODE`, `saxe_exact_solution_exists` (named axiom), `saxe_gronwall_sandwich`, `saxe_gronwall_comparison`, `saxe_singlepole_asymptotic`, `bernoulli_saxe_bound`, `actual_critical_time`, `JEPA_dynamics_ordering`. All sorry-free except the named axiom. |
 | `JepaLearningOrder/JEPA/EncoderHelpers.lean` | Sections 5.4-5.5: Frobenius helpers + Phase-A frozen-encoder convergence (FrobeniusHelpers and EncoderConvergence kept merged per audit — 11-edge bond) |
 | `JepaLearningOrder/JEPA/OffDiagFinal.lean` | Sections 7-8: `offDiag_ODE`, preconditioner integrals, `offDiag_bound`, `sinAngle`, headline `JEPA_rho_ordering` |
 | `JepaLearningOrder/Lemmas.lean` | Supporting lemmas (Grönwall, PD bounds, contractive bound) |
@@ -28,8 +29,7 @@ Part of the **Stochastic Proofs** workspace. Shared conventions and Aristotle wo
 | `JepaLearningOrder/GronwallIntegral.lean` | Grönwall integral machinery |
 | `JepaLearningOrder/PDLowerHelpers.lean` | Six helper lemmas for pd_lower_from_offDiag (Gershgorin, Frobenius norm, det factorization) |
 | `JepaLearningOrder/BootstrapLemmas.lean` | Three sub-lemmas + `bootstrap_consistency` + `uniform_pd_lower_from_compactness` (sessions 24–30) |
-| `JepaLearningOrder/MainTheorem.lean` | `JEPA_rho_ordering'` — main theorem with `hPD_lower` derived via compactness (session 30) |
-| `JepaLearningOrder/SaxeAsymptoticHelpers.lean` | 11 helpers for Saxe ODE asymptotic analysis (session 92): 8 `hittingTime` properties + 3 Lyapunov bounds. Used by `saxe_singlepole_asymptotic` in `Corrected.lean`. |
+| `JepaLearningOrder/SaxeAsymptoticHelpers.lean` | 11 helpers for Saxe ODE asymptotic analysis (session 92): 8 `hittingTime` properties + 3 Lyapunov bounds. Used by `saxe_singlepole_asymptotic` in `JEPA/Saxe.lean`. |
 | `my_theorems/paper.tex` | LaTeX paper — **authoritative spec** for what the theorem should say |
 
 ## Build commands
