@@ -16,7 +16,13 @@ Part of the **Stochastic Proofs** workspace. Shared conventions and Aristotle wo
 
 | Path | Role |
 |---|---|
-| `JepaLearningOrder/JEPA.lean` | Main proof — all theorems including `JEPA_rho_ordering` |
+| `JepaLearningOrder/JEPA.lean` | Re-export shim (session 95 split) — preserves `import JepaLearningOrder.JEPA` for external importers |
+| `JepaLearningOrder/JEPA/Core.lean` | Foundation types (Sections 1, 2): `JEPAData`, `GenEigenpair`/`GenEigenbasis`, `matFrobNorm`, amplitudes, `preconditioner` |
+| `JepaLearningOrder/JEPA/QuasiStatic.lean` | Sections 3-5: `gradient_projection`, `BalancedInit`, `quasiStaticDecoder`, `quasiStatic_approx` |
+| `JepaLearningOrder/JEPA/Bernoulli.lean` | Section 6: critical-time formula/ordering, `hittingTime`, Bernoulli partial-fractions / antideriv / closed-form, `jepa_critical_time_diag` |
+| `JepaLearningOrder/JEPA/DiagAmpODE.lean` | Section 6.5: `diagAmp_ODE` (DEPRECATED), `bernoulli_laurent_bound` (quarantined: 2 active sorries — `h_gronwall`, `h_laurent`), `actual_critical_time` |
+| `JepaLearningOrder/JEPA/EncoderHelpers.lean` | Sections 5.4-5.5: Frobenius helpers + Phase-A frozen-encoder convergence (FrobeniusHelpers and EncoderConvergence kept merged per audit — 11-edge bond) |
+| `JepaLearningOrder/JEPA/OffDiagFinal.lean` | Sections 7-8: `offDiag_ODE`, preconditioner integrals, `offDiag_bound`, `sinAngle`, headline `JEPA_rho_ordering` |
 | `JepaLearningOrder/Lemmas.lean` | Supporting lemmas (Grönwall, PD bounds, contractive bound) |
 | `JepaLearningOrder/OffDiagHelpers.lean` | Bridging helper lemmas |
 | `JepaLearningOrder/GronwallIntegral.lean` | Grönwall integral machinery |
@@ -77,10 +83,10 @@ See `wiki/decisions.md` and `requests/21_bootstrap_request.md` for full proof st
 
 | Lemma | File | Proved by |
 |---|---|---|
-| `contraction_ode_structure` | JEPA.lean ~716 | Aristotle 020b76be |
+| `contraction_ode_structure` | JEPA/EncoderHelpers.lean | Aristotle 020b76be |
 | `contractive_gronwall_decay` | Lemmas.lean ~424 | Aristotle 1afe6f24 |
-| `quasiStatic_approx` | JEPA.lean | Aristotle 1ccc1ab8 |
-| `frozen_encoder_convergence` | JEPA.lean | Aristotle f9906716 (vacuous C_A) |
+| `quasiStatic_approx` | JEPA/QuasiStatic.lean | Aristotle 1ccc1ab8 |
+| `frozen_encoder_convergence` | JEPA/EncoderHelpers.lean | Aristotle f9906716 (vacuous C_A) |
 | `frobenius_pd_lower_bound` | Lemmas.lean ~110 | Exact |
 
 ## Strategic advice
