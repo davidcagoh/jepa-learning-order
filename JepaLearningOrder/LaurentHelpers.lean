@@ -1,5 +1,5 @@
 import Mathlib
-import JepaLearningOrder.JEPA
+import JepaLearningOrder.JEPA.Core
 
 /-!
 # Helper lemmas for `laurent_separation_dominates`

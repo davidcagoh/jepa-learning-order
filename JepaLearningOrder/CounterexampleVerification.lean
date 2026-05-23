@@ -2,6 +2,10 @@
 Copyright (c) 2026. All rights reserved.
 Released under MIT license.
 
+**Intentional orphan** — no importers by design. This file documents the RK4
+disproof of the 4th conjunct of `saxe_exact_solution_exists` (session 94) and
+exists for the human reader, not the build graph. Tier-1 audits should skip it.
+
 # Numerical counterexample for `saxe_exact_solution_exists`
 
 This file provides a computational verification that the 4th conjunct

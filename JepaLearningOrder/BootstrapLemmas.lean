@@ -1,7 +1,7 @@
 import Mathlib
 import JepaLearningOrder.Lemmas
 import JepaLearningOrder.OffDiagHelpers
-import JepaLearningOrder.JEPA
+import JepaLearningOrder.JEPA.OffDiagFinal
 import JepaLearningOrder.PDLowerHelpers
 
 /-!

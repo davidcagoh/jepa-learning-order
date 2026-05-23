@@ -40,7 +40,8 @@ correct in direction (features learned in ρ-order); only quantitative bounds
 change.
 -/
 
-import JepaLearningOrder.JEPA
+import JepaLearningOrder.JEPA.DiagAmpODE
+import JepaLearningOrder.JEPA.EncoderHelpers
 import JepaLearningOrder.Lemmas
 import JepaLearningOrder.SaxeAsymptoticHelpers
 import Mathlib.Analysis.SpecialFunctions.Pow.Real

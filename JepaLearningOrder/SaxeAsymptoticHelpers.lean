@@ -3,7 +3,7 @@ Helper lemmas for the proof of `saxe_singlepole_asymptotic`.
 These establish hittingTime properties and energy/Lyapunov bounds
 for the Saxe ODE.
 -/
-import JepaLearningOrder.JEPA
+import JepaLearningOrder.JEPA.Bernoulli
 import Mathlib
 
 namespace JepaLearningOrder

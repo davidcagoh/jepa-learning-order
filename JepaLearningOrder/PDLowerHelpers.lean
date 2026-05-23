@@ -1,6 +1,6 @@
 import Mathlib
 import JepaLearningOrder.Lemmas
-import JepaLearningOrder.JEPA
+import JepaLearningOrder.JEPA.Core
 
 /-!
 # Helper lemmas for pd_lower_from_offDiag (Lemma B.2)
