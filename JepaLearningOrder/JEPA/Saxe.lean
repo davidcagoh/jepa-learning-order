@@ -53,7 +53,7 @@ open Real Filter Topology
 /-! ## §0. Helper lemmas for the Saxe-form derivation (Aristotle `c121d919`).
 
     These prepare the algebraic structure for a future genuine
-    (non-compactness-trick) derivation of `diagAmp_ODE_corrected`.
+    (non-compactness-trick) derivation of `diagAmp_ODE`.
     The vacuous-discharge proof currently used relies on `preconditioner_self`
     for the σ-power algebra and `gradient_dot_eq` for the bilinear form. -/
 
@@ -139,7 +139,7 @@ functional bound.
 The signature mirrors `diagAmp_ODE` exactly (same hypotheses, same shape),
 only the conclusion bracket is corrected and the proof must be genuine.
 -/
-theorem diagAmp_ODE_corrected (dat : JEPAData d) (eb : GenEigenbasis dat)
+theorem diagAmp_ODE (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L) (epsilon : ℝ) (heps : 0 < epsilon) (heps_small : epsilon < 1)
     (t_max : ℝ) (ht_max : 0 < t_max)
     (V Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ)
@@ -285,7 +285,7 @@ The third paper-2 piece (`bernoulli_exact_laurent`) is paper-1's already-proved
     when `p^L ≤ 1/2`, but fails for `p` close to 1.
 
     **Why this is axiomatized rather than restated.** The headline result
-    (`JEPA_dynamics_ordering_corrected`) fixes `p ∈ (0, 1)` once and for
+    (`JEPA_dynamics_ordering`) fixes `p ∈ (0, 1)` once and for
     all — `p` is a parameter chosen by the user, not a limit. In every
     fixed-`p` regime, conjunct 4 IS provable (with an appropriately
     strengthened `h_t_max_reach` that absorbs the `(1 − p^L)` factor).
@@ -686,7 +686,7 @@ lemma saxe_singlepole_asymptotic (L : ℕ) (hL : 2 ≤ L)
             nlinarith [mul_nonneg hA_nn (hθrp_nn exp_),
                        mul_nonneg hA_nn (hθrp_nn (-(1:ℝ)/(L:ℝ)))]
 
-theorem bernoulli_saxe_bound_corrected (L : ℕ) (hL : 2 ≤ L)
+theorem bernoulli_saxe_bound (L : ℕ) (hL : 2 ≤ L)
     (lam_r rho_r : ℝ) (hlam : 0 < lam_r) (hrho : 0 < rho_r)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
     (t_max : ℝ) (ht_max : 0 < t_max)
@@ -755,8 +755,8 @@ theorem bernoulli_saxe_bound_corrected (L : ℕ) (hL : 2 ≤ L)
 
 /-! ## §3. Corrected critical-time and ordering theorems
 
-    These are composition wrappers using `diagAmp_ODE_corrected` +
-    `bernoulli_saxe_bound_corrected`. The downstream changes are
+    These are composition wrappers using `diagAmp_ODE` +
+    `bernoulli_saxe_bound`. The downstream changes are
     mechanical: threshold update, time-scale exponent update.
 -/
 
@@ -768,7 +768,7 @@ under the Saxe ODE form: σ_r evolves with the corrected bracket, and
 the hitting-time threshold is `p · ρ_r^{1/L}` (not `p · ρ_r^L`).
 The estimate is `K · ε^{-(L-2)/L}` distance from the single-pole asymptotic.
 -/
-theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis dat)
+theorem actual_critical_time (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L)
     (t_max : ℝ) (ht_max : 0 < t_max)
     (p : ℝ) (hp : 0 < p) (hp_lt : p < 1)
@@ -776,7 +776,7 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
     (C : ℝ) (hC : 0 < C) :
     ∃ K : ℝ, 0 < K ∧
     ∀ (epsilon : ℝ), 0 < epsilon → epsilon < 1 →
-    -- Statement-honesty hypothesis threaded from `bernoulli_saxe_bound_corrected`.
+    -- Statement-honesty hypothesis threaded from `bernoulli_saxe_bound`.
     (2 : ℝ) / ((projectedCovariance dat eb r) * ((L : ℝ) - 1) *
         epsilon ^ (((L : ℝ) - 1) / (L : ℝ))) ≤ t_max →
     ∀ (Wbar : ℝ → Matrix (Fin d) (Fin d) ℝ),
@@ -801,13 +801,13 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
         ≤ K * epsilon ^ (-((L : ℝ) - 2) / L) := by
   -- Aristotle job b853ca6d (session 90). Mechanical composition.
   -- Updated session 92: threads `h_t_max_reach` + `ContinuousOn` +
-  -- `DifferentiableAt` + `hf_reach` through to `bernoulli_saxe_bound_corrected`.
+  -- `DifferentiableAt` + `hf_reach` through to `bernoulli_saxe_bound`.
   have hlam_pos : (0 : ℝ) < projectedCovariance dat eb r :=
     mul_pos (eb.hpos r) (eb.pairs r).hmu_pos
   have hmu_eq : (eb.pairs r).mu = projectedCovariance dat eb r / (eb.pairs r).rho := by
     simp [projectedCovariance, mul_div_cancel_left₀ _ (ne_of_gt (eb.hpos r))]
   obtain ⟨K, hK_pos, hK_bound⟩ :=
-    bernoulli_saxe_bound_corrected L hL
+    bernoulli_saxe_bound L hL
       (projectedCovariance dat eb r) ((eb.pairs r).rho)
       hlam_pos (eb.hpos r)
       p hp hp_lt t_max ht_max C hC
@@ -858,10 +858,10 @@ theorem actual_critical_time_corrected (dat : JEPAData d) (eb : GenEigenbasis da
     * Strict λ-ordering instead of `λ_r ≥ λ_s ∧ ρ_r > ρ_s`
     * Single divergent term ε^{-(L-1)/L} instead of 2L−1 Laurent terms
 
-    **Proof:** queued (composes `actual_critical_time_corrected` for r and s
+    **Proof:** queued (composes `actual_critical_time` for r and s
     with a `λ-separation` lemma that's a direct comparison of two reciprocals,
     much simpler than the original `laurent_separation_dominates`). -/
-theorem JEPA_dynamics_ordering_corrected (dat : JEPAData d) (eb : GenEigenbasis dat)
+theorem JEPA_dynamics_ordering (dat : JEPAData d) (eb : GenEigenbasis dat)
     (L : ℕ) (hL : 2 ≤ L)
     (t_max : ℝ) (ht_max : 0 < t_max)
     (Wbar : ℝ → ℝ → Matrix (Fin d) (Fin d) ℝ)
@@ -920,13 +920,13 @@ theorem JEPA_dynamics_ordering_corrected (dat : JEPAData d) (eb : GenEigenbasis 
                      (p * Real.rpow (eb.pairs r).rho ((1 : ℝ) / L)) t_max
         < hittingTime (fun t => diagAmplitude dat eb (Wbar epsilon t) s)
                      (p * Real.rpow (eb.pairs s).rho ((1 : ℝ) / L)) t_max := by
-  -- Step 1: Extract uniform constants K_r, K_s from `actual_critical_time_corrected`.
+  -- Step 1: Extract uniform constants K_r, K_s from `actual_critical_time`.
   obtain ⟨C_r, hC_r_pos, hode_r_bd⟩ := hode_r
   obtain ⟨C_s, hC_s_pos, hode_s_bd⟩ := hode_s
   obtain ⟨K_r, hK_r_pos, hK_r_bd⟩ :=
-    actual_critical_time_corrected dat eb L hL t_max ht_max p hp hp_lt r C_r hC_r_pos
+    actual_critical_time dat eb L hL t_max ht_max p hp hp_lt r C_r hC_r_pos
   obtain ⟨K_s, hK_s_pos, hK_s_bd⟩ :=
-    actual_critical_time_corrected dat eb L hL t_max ht_max p hp hp_lt s C_s hC_s_pos
+    actual_critical_time dat eb L hL t_max ht_max p hp hp_lt s C_s hC_s_pos
   -- Step 2: Positivity facts.
   have hlamr_pos : 0 < projectedCovariance dat eb r :=
     mul_pos (eb.hpos r) (eb.pairs r).hmu_pos
